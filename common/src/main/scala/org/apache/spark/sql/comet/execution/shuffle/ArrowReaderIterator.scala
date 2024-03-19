@@ -23,7 +23,7 @@ import java.nio.channels.ReadableByteChannel
 
 import org.apache.spark.sql.vectorized.ColumnarBatch
 
-import org.apache.comet.vector.StreamReader
+import org.apache.comet.vector._
 
 class ArrowReaderIterator(channel: ReadableByteChannel) extends Iterator[ColumnarBatch] {
 
@@ -55,6 +55,20 @@ class ArrowReaderIterator(channel: ReadableByteChannel) extends Iterator[Columna
     // memory leak.
     if (currentBatch != null) {
       currentBatch.close()
+      // scalastyle:off println
+      println("closed previous reader's currentBatch")
+    }
+
+    // scalastyle:off println
+    for (i <- 0 until nextBatch.numCols) {
+      val col = nextBatch.column(i)
+      col match {
+        case c: CometPlainVector =>
+          println(
+            s"reader's CometBatchRDD column $i: ${c.numValues()}, ${c.dataType()}, " +
+              s"${c.getValueVector()}")
+        case _ =>
+      }
     }
 
     currentBatch = nextBatch

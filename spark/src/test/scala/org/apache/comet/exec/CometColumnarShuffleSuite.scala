@@ -65,11 +65,11 @@ abstract class CometColumnarShuffleSuite extends CometTestBase with AdaptiveSpar
   import testImplicits._
 
   test("columnar shuffle on nested struct including nulls") {
-    Seq(10, 201).foreach { numPartitions =>
+    Seq(2, 201).foreach { numPartitions =>
       Seq("1.0", "10.0").foreach { ratio =>
         withSQLConf(CometConf.COMET_SHUFFLE_PREFER_DICTIONARY_RATIO.key -> ratio) {
           withParquetTable(
-            (0 until 50).map(i =>
+            (0 until 50000).map(i =>
               (i, Seq((i + 1, i.toString), null, (i + 3, (i + 3).toString)), i + 1)),
             "tbl") {
             val df = sql("SELECT * FROM tbl")
@@ -943,7 +943,7 @@ class CometShuffleSuite extends CometColumnarShuffleSuite {
       CometConf.COMET_EXEC_ENABLED.key -> "true",
       CometConf.COMET_EXEC_SHUFFLE_ENABLED.key -> "true",
       CometConf.COMET_COLUMNAR_SHUFFLE_ENABLED.key -> "true") {
-      withParquetTable((0 until 10).map(i => (i, i % 5)), "tbl_a") {
+      withParquetTable((0 until 10000).map(i => (i, i % 5)), "tbl_a") {
         val df = sql("SELECT * FROM tbl_a")
         val shuffled = df
           .select($"_1" + 1 as ("a"))
