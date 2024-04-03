@@ -347,7 +347,9 @@ impl Stream for ScanStream {
         let result = match input_batch {
             InputBatch::EOF => Poll::Ready(None),
             InputBatch::Batch(columns, num_rows) => {
-                Poll::Ready(Some(self.build_record_batch(columns, *num_rows)))
+                let batch = self.build_record_batch(columns, *num_rows);
+                println!("ScanStream: {:?}", batch);
+                Poll::Ready(Some(batch))
             }
         };
 

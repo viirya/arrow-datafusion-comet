@@ -81,6 +81,8 @@ abstract class CometExec extends CometPlan {
       val cbbos = new ChunkedByteBufferOutputStream(1024 * 1024, ByteBuffer.allocate)
       val out = new DataOutputStream(codec.compressedOutputStream(cbbos))
 
+      // scalastyle:off println
+      println(s"getByteArrayRdd: $this")
       val count = new NativeUtil().serializeBatches(iter, out)
 
       out.flush()

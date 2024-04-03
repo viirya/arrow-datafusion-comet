@@ -51,6 +51,14 @@ case class StreamReader(channel: ReadableByteChannel) extends AutoCloseable {
       // Native shuffle always uses decimal128.
       CometVector.getVector(vector, true, arrowReader).asInstanceOf[ColumnVector]
     }.toArray
+
+    for (id <- arrowReader.getDictionaryIds.asScala) {
+      val dictionary = arrowReader.lookup(id)
+      val vector = dictionary.getVector()
+      // scalastyle:off println
+      println(s"StreamReader: dictionary id: $id, value: $vector")
+    }
+
     val batch = new ColumnarBatch(columns)
     batch.setNumRows(root.getRowCount)
     batch

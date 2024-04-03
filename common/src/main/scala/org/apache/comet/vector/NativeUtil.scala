@@ -50,11 +50,61 @@ class NativeUtil {
   def serializeBatches(batches: Iterator[ColumnarBatch], out: OutputStream): Long = {
     var writer: Option[CometArrowStreamWriter] = None
     var rowCount = 0
+    var prevProvider: Option[DictionaryProvider] = None
 
-    batches.foreach { batch =>
-      val (fieldVectors, batchProviderOpt) = getBatchFieldVectors(batch)
+    batches.zipWithIndex.foreach { case (batch, idx) =>
+      val (_, batchProviderOpt) = getBatchFieldVectors(batch)
+      if (prevProvider.isDefined && prevProvider.get !=
+          batchProviderOpt.getOrElse(dictionaryProvider)) {
+        throw new SparkException(
+          "Comet execution only takes Arrow Arrays with the same dictionary provider")
+      } else {
+        prevProvider = batchProviderOpt
+      }
+    }
+
+    val provider = prevProvider.getOrElse(dictionaryProvider)
+
+    for (id <- provider.getDictionaryIds.asScala) {
+      val dictionary = provider.lookup(id)
+      val vector = dictionary.getVector()
+      // scalastyle:off println
+      println(s"serializeBatches: dictionary id: $id, value: $vector")
+    }
+
+    batches.zipWithIndex.foreach { case (batch, idx) =>
+      // scalastyle:off println
+      println(s"serializeBatches (idx: $idx): batch.numCols: ${batch.numCols()}")
+      for (i <- 0 until batch.numCols()) {
+        batch.column(i) match {
+          case a: CometPlainVector =>
+            val valueVector = a.getValueVector
+            println(s"serializeBatches: valueVector: $valueVector")
+
+          case a: CometDictionaryVector =>
+            val indices = a.indices
+            val dictionary = a.values
+            println(s"serializeBatches: indices: ${indices.getValueVector}")
+            println(s"serializeBatches: dictionary: ${dictionary.getValueVector}")
+
+            val dictId = indices.getValueVector.getField.getDictionary.getId
+            println(s"serializeBatches: dictionary dictId: $dictId")
+          case _ =>
+
+        }
+      }
+
+      val (fieldVectors, _) = getBatchFieldVectors(batch)
       val root = new VectorSchemaRoot(fieldVectors.asJava)
-      val provider = batchProviderOpt.getOrElse(dictionaryProvider)
+
+      // scalastyle:off println
+      println(s"serializeBatches (idx: $idx): provider: ${provider.getDictionaryIds}")
+
+      for (id <- provider.getDictionaryIds.asScala) {
+        val dictionary = provider.lookup(id)
+        val vector = dictionary.getVector()
+        println(s"serializeBatches (idx: $idx): dictionary id: $id, value: $vector")
+      }
 
       if (writer.isEmpty) {
         writer = Some(new CometArrowStreamWriter(root, provider, Channels.newChannel(out)))
@@ -81,6 +131,9 @@ class NativeUtil {
         case a: CometVector =>
           val valueVector = a.getValueVector
           if (valueVector.getField.getDictionary != null) {
+            // scalastyle:off println
+            // println(s"Dictionary is not null: $valueVector")
+
             if (provider.isEmpty) {
               provider = Some(a.getDictionaryProvider)
             } else {

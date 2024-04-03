@@ -95,6 +95,7 @@ pub fn copy_or_cast_array(array: &dyn Array) -> Result<ArrayRef, ArrowError> {
     match array.data_type() {
         DataType::Dictionary(_, value_type) => {
             let options = CastOptions::default();
+            println!("Dictionary array: {:?}", array);
             let casted = cast_with_options(array, value_type.as_ref(), &options);
 
             casted.and_then(|a| copy_or_cast_array(a.as_ref()))
