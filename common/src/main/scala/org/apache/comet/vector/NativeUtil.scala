@@ -53,26 +53,6 @@ class NativeUtil {
     var prevProvider: Option[DictionaryProvider] = None
 
     batches.zipWithIndex.foreach { case (batch, idx) =>
-      val (_, batchProviderOpt) = getBatchFieldVectors(batch)
-      if (prevProvider.isDefined && prevProvider.get !=
-          batchProviderOpt.getOrElse(dictionaryProvider)) {
-        throw new SparkException(
-          "Comet execution only takes Arrow Arrays with the same dictionary provider")
-      } else {
-        prevProvider = batchProviderOpt
-      }
-    }
-
-    val provider = prevProvider.getOrElse(dictionaryProvider)
-
-    for (id <- provider.getDictionaryIds.asScala) {
-      val dictionary = provider.lookup(id)
-      val vector = dictionary.getVector()
-      // scalastyle:off println
-      println(s"serializeBatches: dictionary id: $id, value: $vector")
-    }
-
-    batches.zipWithIndex.foreach { case (batch, idx) =>
       // scalastyle:off println
       println(s"serializeBatches (idx: $idx): batch.numCols: ${batch.numCols()}")
       for (i <- 0 until batch.numCols()) {
@@ -94,8 +74,16 @@ class NativeUtil {
         }
       }
 
-      val (fieldVectors, _) = getBatchFieldVectors(batch)
+      val (fieldVectors, batchProviderOpt) = getBatchFieldVectors(batch)
       val root = new VectorSchemaRoot(fieldVectors.asJava)
+      if (prevProvider.isDefined && prevProvider.get !=
+          batchProviderOpt.getOrElse(dictionaryProvider)) {
+        throw new SparkException(
+          "Comet execution only takes Arrow Arrays with the same dictionary provider")
+      } else {
+        prevProvider = batchProviderOpt
+      }
+      val provider = batchProviderOpt.getOrElse(dictionaryProvider)
 
       // scalastyle:off println
       println(s"serializeBatches (idx: $idx): provider: ${provider.getDictionaryIds}")
