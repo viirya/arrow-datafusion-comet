@@ -222,9 +222,37 @@ abstract class CometNativeExec extends CometExec {
 
         // Collect the input ColumnarBatches from the child operators and create a CometExecIterator
         // to execute the native plan.
+        val sparkPlans = ArrayBuffer.empty[SparkPlan]
+        foreachUntilCometInput(this)(sparkPlans += _)
+
+        // Spark doesn't need to zip Broadcast RDDs, so it doesn't schedule Broadcast RDDs with
+        // same partition number. But for Comet, we need to zip them so we need to adjust the
+        // partition number of Broadcast RDDs to make sure they have the same partition number.
+        val (broadcastPlans, plans) = sparkPlans.partition { plan =>
+          plan.find {
+            case _: CometBroadcastExchangeExec => true
+            case _ => false
+          }.isDefined
+        }
+
         val inputs = ArrayBuffer.empty[RDD[ColumnarBatch]]
 
-        foreachUntilCometInput(this)(inputs += _.executeColumnar())
+        plans.map(_.executeColumnar()).foreach(inputs += _)
+        val numPartitions = inputs.map(_.getNumPartitions).distinct
+        if (numPartitions.length > 1) {
+          throw new CometRuntimeException(
+            s"Cannot zip RDDs with same partition number, got $numPartitions")
+        }
+
+        if (broadcastPlans.nonEmpty) {
+          broadcastPlans.foreach { broadcastPlan =>
+            val rdd = broadcastPlan
+              .asInstanceOf[CometBroadcastExchangeExec]
+              .setNumPartitions(numPartitions(0))
+              .executeColumnar()
+            inputs += rdd
+          }
+        }
 
         if (inputs.isEmpty) {
           throw new CometRuntimeException(s"No input for CometNativeExec: $this")
