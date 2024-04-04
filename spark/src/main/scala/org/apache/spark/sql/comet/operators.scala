@@ -231,6 +231,7 @@ abstract class CometNativeExec extends CometExec {
         val (broadcastPlans, plans) = sparkPlans.partition { plan =>
           plan.find {
             case _: CometBroadcastExchangeExec => true
+            case BroadcastQueryStageExec(_, _: CometBroadcastExchangeExec, _) => true
             case _ => false
           }.isDefined
         }
@@ -246,16 +247,26 @@ abstract class CometNativeExec extends CometExec {
 
         if (broadcastPlans.nonEmpty) {
           broadcastPlans.foreach { broadcastPlan =>
-            val rdd = broadcastPlan
-              .asInstanceOf[CometBroadcastExchangeExec]
-              .setNumPartitions(numPartitions(0))
-              .executeColumnar()
-            inputs += rdd
+            broadcastPlan match {
+              case c: CometBroadcastExchangeExec =>
+                c.setNumPartitions(numPartitions(0))
+              case BroadcastQueryStageExec(_, c: CometBroadcastExchangeExec, _) =>
+                c.setNumPartitions(numPartitions(0))
+              case _ =>
+                throw new CometRuntimeException(
+                  s"Unexpected plan type for broadcast plan: $broadcastPlan")
+            }
           }
+          broadcastPlans.map(_.executeColumnar()).foreach(inputs += _)
         }
 
         if (inputs.isEmpty) {
           throw new CometRuntimeException(s"No input for CometNativeExec: $this")
+        }
+
+        if (inputs.size != sparkPlans.size) {
+          throw new CometRuntimeException(
+            s"Number of inputs doesn't match number of plans: $inputs vs. $sparkPlans")
         }
 
         ZippedPartitionsRDD(sparkContext, inputs.toSeq)(createCometExecIter(_))

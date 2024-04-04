@@ -104,6 +104,8 @@ case class CometBroadcastExchangeExec(originalPlan: SparkPlan, child: SparkPlan)
     this
   }
   def getNumPartitions(): Int = {
+    // scalastyle:off println
+    println(s"numPartitions: $numPartitions")
     numPartitions.getOrElse(child.executeColumnar().getNumPartitions)
   }
 
