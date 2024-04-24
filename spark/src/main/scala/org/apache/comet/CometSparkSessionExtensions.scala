@@ -743,6 +743,10 @@ class CometSparkSessionExtensions
         // Set up logical links
         newPlan = newPlan.transform { case op: CometExec =>
           op.originalPlan.logicalLink.foreach(op.setLogicalLink)
+          // scalastyle:off println
+          println(
+            s"op: $op, logicalLink: ${op.logicalLink}, " +
+              s"originalPlan: ${op.originalPlan}")
           op
         }
 
