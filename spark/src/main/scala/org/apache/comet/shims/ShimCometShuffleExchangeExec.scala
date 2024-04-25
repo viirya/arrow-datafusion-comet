@@ -32,15 +32,16 @@ trait ShimCometShuffleExchangeExec {
     val cometShuffle = CometShuffleExchangeExec(
       s.outputPartitioning,
       s.child,
+      s,
       s.shuffleOrigin,
       shuffleType,
       advisoryPartitionSize)
     // Set logical link to the new CometShuffleExchangeExec to make AQE work correctly
-    s.logicalLink.foreach(cometShuffle.setLogicalLink)
+    // s.logicalLink.foreach(cometShuffle.setLogicalLink)
     // scalastyle:off println
-    println(
-      s"s: $s, s.logicalLink: ${s.logicalLink}, cometShuffle: $cometShuffle, " +
-        s"${cometShuffle.logicalLink}")
+    // println(
+    //  s"s: $s, s.logicalLink: ${s.logicalLink}, cometShuffle: $cometShuffle, " +
+    //    s"${cometShuffle.logicalLink}")
     cometShuffle
   }
 }
