@@ -21,7 +21,7 @@ package org.apache.comet.vector
 
 import java.nio.channels.ReadableByteChannel
 
-import org.apache.arrow.memory.RootAllocator
+import org.apache.arrow.memory.{BufferAllocator, RootAllocator}
 import org.apache.arrow.vector.VectorSchemaRoot
 import org.apache.arrow.vector.ipc.{ArrowStreamReader, ReadChannel}
 import org.apache.arrow.vector.ipc.message.MessageChannelReader
@@ -37,16 +37,26 @@ case class StreamReader(channel: ReadableByteChannel, source: String) extends Au
   private var arrowReader = new ArrowStreamReader(channelReader, allocator)
   private var root = arrowReader.getVectorSchemaRoot
 
+  def getAllocator(): BufferAllocator = allocator
+
   def nextBatch(): Option[ColumnarBatch] = {
+    // scalastyle:off println
+    println("Reading next batch: " + allocator.getAllocatedMemory)
     if (arrowReader.loadNextBatch()) {
+      println("After read: " + allocator.getAllocatedMemory)
       Some(rootAsBatch(root))
     } else {
+      println("EOF: " + allocator.getAllocatedMemory)
       None
     }
   }
 
   private def rootAsBatch(root: VectorSchemaRoot): ColumnarBatch = {
-    NativeUtil.rootAsBatch(root, arrowReader)
+    // scalastyle:off println
+    println("Converting batch: " + allocator.getAllocatedMemory)
+    val batch = NativeUtil.rootAsBatch(root, arrowReader)
+    println("After converting: " + allocator.getAllocatedMemory)
+    batch
   }
 
   override def close(): Unit = {
