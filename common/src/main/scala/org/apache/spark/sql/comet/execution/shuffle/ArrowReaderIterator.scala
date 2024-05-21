@@ -59,6 +59,25 @@ class ArrowReaderIterator(channel: ReadableByteChannel, source: String)
     val nextBatch = batch.get
 
     currentBatch = nextBatch
+    // scalastyle:off println
+    println(s"currentBatch.numCols: ${currentBatch.numCols()}")
+    for (i <- 0 until currentBatch.numCols()) {
+      currentBatch.column(i) match {
+        case a: CometPlainVector =>
+          val valueVector = a.getValueVector
+          println(s"valueVector: $valueVector")
+
+        case a: CometDictionaryVector =>
+          val indices = a.indices
+          val dictionary = a.values
+          println(s"indices: ${indices.getValueVector}")
+          println(s"dictionary: ${dictionary.getValueVector}")
+          println(s"dictionary dictId: ${indices.getValueVector.getField.getDictionary.getId}")
+        case _ =>
+
+      }
+    }
+
     batch = None
     currentBatch
   }
