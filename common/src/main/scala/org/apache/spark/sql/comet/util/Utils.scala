@@ -220,6 +220,7 @@ object Utils {
         }
       }
 
+      /*
       val dictionaryProvider: CDataDictionaryProvider = new CDataDictionaryProvider
 
       val codec = CompressionCodec.createCodec(SparkEnv.get.conf)
@@ -234,11 +235,16 @@ object Utils {
       writer.start()
       writer.writeBatch()
 
-      root.clear()
+      // root.clear()
       writer.end()
 
       out.flush()
       out.close()
+       */
+
+      val codec = CompressionCodec.createCodec(SparkEnv.get.conf)
+      val cbbos = new ChunkedByteBufferOutputStream(1024 * 1024, ByteBuffer.allocate)
+      val out = new DataOutputStream(codec.compressedOutputStream(cbbos))
 
       if (out.size() > 0) {
         (batch.numRows(), cbbos.toChunkedByteBuffer)

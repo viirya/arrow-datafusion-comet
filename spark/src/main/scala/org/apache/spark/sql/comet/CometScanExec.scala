@@ -44,6 +44,7 @@ import org.apache.spark.util.collection._
 import org.apache.comet.{CometConf, MetricsSupport}
 import org.apache.comet.parquet.{CometParquetFileFormat, CometParquetPartitionReaderFactory}
 import org.apache.comet.shims.{ShimCometScanExec, ShimFileFormat}
+import org.apache.comet.vector._
 
 /**
  * Comet physical scan node for DataSource V1. Most of the code here follow Spark's
@@ -232,6 +233,27 @@ case class CometScanExec(
         override def next(): ColumnarBatch = {
           val batch = batches.next()
           numOutputRows += batch.numRows()
+
+          // scalastyle:off println
+          println(s"CometScanExec batch.numCols: ${batch.numCols()}")
+          for (i <- 0 until batch.numCols()) {
+            batch.column(i) match {
+              case a: CometPlainVector =>
+                val valueVector = a.getValueVector
+                println(s"valueVector: $valueVector")
+
+              case a: CometDictionaryVector =>
+                val indices = a.indices
+                val dictionary = a.values
+                println(s"indices: ${indices.getValueVector}")
+                println(s"dictionary: ${dictionary.getValueVector}")
+                println(
+                  s"dictionary dictId: " +
+                    s"${indices.getValueVector.getField.getDictionary.getId}")
+              case _ =>
+
+            }
+          }
           batch
         }
       }
