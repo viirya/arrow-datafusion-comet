@@ -140,6 +140,10 @@ impl ParquetMutableVector {
         } else if Self::should_reset_value_buffer(&self.arrow_type) {
             self.value_buffer.reset();
         }
+
+        if let Some(d) = &mut self.dictionary {
+            println!("resetting dictionary: {:?}", d);
+        }
     }
 
     /// Appends a new null value to the end of this vector.
