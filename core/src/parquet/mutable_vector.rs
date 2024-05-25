@@ -142,7 +142,7 @@ impl ParquetMutableVector {
         }
 
         if let Some(d) = &mut self.dictionary {
-            println!("resetting dictionary: {:?}", d);
+            // println!("resetting dictionary: {:?}", d);
         }
     }
 

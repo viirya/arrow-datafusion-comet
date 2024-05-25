@@ -60,7 +60,7 @@ class ArrowReaderIterator(channel: ReadableByteChannel, source: String)
 
     currentBatch = nextBatch
     // scalastyle:off println
-    println(s"currentBatch.numCols: ${currentBatch.numCols()}")
+    println(s"source: $source, currentBatch.numCols: ${currentBatch.numCols()}")
     for (i <- 0 until currentBatch.numCols()) {
       currentBatch.column(i) match {
         case a: CometPlainVector =>

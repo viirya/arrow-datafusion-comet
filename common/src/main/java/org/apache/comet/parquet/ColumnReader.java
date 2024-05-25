@@ -196,7 +196,9 @@ public class ColumnReader extends AbstractColumnReader {
     // Close the previous vector first to release struct memory allocated to import Arrow array &
     // schema from native side, through the C data interface
     if (currentVector != null) {
+      // System.out.println("before close. loadVector dictionary: " + dictionary.getValueVector());
       currentVector.close();
+      // System.out.println("after close. loadVector dictionary: " + dictionary.getValueVector());
     }
 
     long[] addresses = Native.currentBatch(nativeHandle);
@@ -204,6 +206,7 @@ public class ColumnReader extends AbstractColumnReader {
     try (ArrowArray array = ArrowArray.wrap(addresses[0]);
         ArrowSchema schema = ArrowSchema.wrap(addresses[1])) {
       FieldVector vector = Data.importVector(ALLOCATOR, array, schema, dictionaryProvider);
+
       DictionaryEncoding dictionaryEncoding = vector.getField().getDictionary();
 
       CometPlainVector cometVector = new CometPlainVector(vector, useDecimal128);
@@ -224,14 +227,14 @@ public class ColumnReader extends AbstractColumnReader {
         // return plain vector.
         currentVector = cometVector;
         return currentVector;
-      } else if (dictionary == null) {
-        // There is dictionary from native side but the Java side dictionary hasn't been
-        // initialized yet.
-        Dictionary arrowDictionary = dictionaryProvider.lookup(dictionaryEncoding.getId());
-        CometPlainVector dictionaryVector =
-            new CometPlainVector(arrowDictionary.getVector(), useDecimal128);
-        dictionary = new CometDictionary(dictionaryVector);
       }
+
+      // There is dictionary from native side but the Java side dictionary hasn't been
+      // initialized yet.
+      Dictionary arrowDictionary = dictionaryProvider.lookup(dictionaryEncoding.getId());
+      CometPlainVector dictionaryVector =
+          new CometPlainVector(arrowDictionary.getVector(), useDecimal128);
+      dictionary = new CometDictionary(dictionaryVector);
 
       currentVector =
           new CometDictionaryVector(cometVector, dictionary, dictionaryProvider, useDecimal128);
