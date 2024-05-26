@@ -193,9 +193,7 @@ public class ColumnReader extends AbstractColumnReader {
     // Close the previous vector first to release struct memory allocated to import Arrow array &
     // schema from native side, through the C data interface
     if (currentVector != null) {
-      // System.out.println("before close. loadVector dictionary: " + dictionary.getValueVector());
       currentVector.close();
-      // System.out.println("after close. loadVector dictionary: " + dictionary.getValueVector());
     }
 
     long[] addresses = Native.currentBatch(nativeHandle);

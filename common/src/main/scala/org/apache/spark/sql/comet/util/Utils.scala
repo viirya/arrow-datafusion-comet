@@ -202,25 +202,6 @@ object Utils {
    */
   def serializeBatches(batches: Iterator[ColumnarBatch]): Iterator[(Long, ChunkedByteBuffer)] = {
     batches.map { batch =>
-      // scalastyle:off println
-      println(s"serializing batch.numCols: ${batch.numCols()}")
-      for (i <- 0 until batch.numCols()) {
-        batch.column(i) match {
-          case a: CometPlainVector =>
-            val valueVector = a.getValueVector
-            println(s"valueVector: $valueVector")
-
-          case a: CometDictionaryVector =>
-            val indices = a.indices
-            val dictionary = a.values
-            println(s"indices: ${indices.getValueVector}")
-            println(s"dictionary: ${dictionary.getValueVector}")
-            println(s"dictionary dictId: ${indices.getValueVector.getField.getDictionary.getId}")
-          case _ =>
-
-        }
-      }
-
       val dictionaryProvider: CDataDictionaryProvider = new CDataDictionaryProvider
 
       val codec = CompressionCodec.createCodec(SparkEnv.get.conf)
