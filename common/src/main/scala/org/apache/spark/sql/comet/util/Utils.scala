@@ -265,24 +265,4 @@ object Utils {
         throw new SparkException(s"Unsupported Arrow Vector for $reason: ${valueVector.getClass}")
     }
   }
-
-  /**
-   * Imports data from ArrowArray/ArrowSchema into a FieldVector. This is basically the same as
-   * Java Arrow `Data.importVector`. `Data.importVector` initiates `SchemaImporter` internally
-   * which is used to fill dictionary ids for dictionary encoded vectors. Every call to
-   * `importVector` will begin with dictionary ids starting from 0. So, separate calls to
-   * `importVector` will overwrite dictionary ids. To avoid this, we need to use the same
-   * `SchemaImporter` instance for all calls to `importVector`.
-   */
-  def importVector(
-      allocator: BufferAllocator,
-      importer: CometSchemaImporter,
-      array: ArrowArray,
-      schema: ArrowSchema): FieldVector = {
-    val field = importer.importField(schema)
-    val vector = field.createVector(allocator)
-    Data.importIntoVector(allocator, array, vector, importer.getProvider())
-
-    vector
-  }
 }
