@@ -120,8 +120,6 @@ object CometExec {
    */
   def getByteArrayRdd(cometPlan: CometPlan): RDD[(Long, ChunkedByteBuffer)] = {
     cometPlan.executeColumnar().mapPartitionsInternal { iter =>
-      // scalastyle:off println
-      println(s"cometPlan: ${cometPlan.getClass.getSimpleName}")
       Utils.serializeBatches(iter)
     }
   }

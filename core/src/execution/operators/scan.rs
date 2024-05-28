@@ -322,15 +322,6 @@ impl ScanStream {
             .zip(schema_fields.iter())
             .map(|(column, f)| {
                 if column.data_type() != f.data_type() {
-                    if matches!(column.data_type(), DataType::Dictionary(_, _)) {
-                        println!(
-                            "Casting column {:?} to {:?}",
-                            column.data_type(),
-                            f.data_type()
-                        );
-                        println!("name: {}, num_rows: {:?}", self.scan.name, num_rows);
-                        println!("Column: {:?}", column);
-                    }
                     cast_with_options(column, f.data_type(), &cast_options).unwrap()
                 } else {
                     column.clone()
