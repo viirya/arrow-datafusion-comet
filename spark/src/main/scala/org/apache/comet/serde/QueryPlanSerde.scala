@@ -203,7 +203,8 @@ object QueryPlanSerde extends Logging with ShimQueryPlanSerde with CometExprShim
   def aggExprToProto(
       aggExpr: AggregateExpression,
       inputs: Seq[Attribute],
-      binding: Boolean): Option[AggExpr] = {
+      binding: Boolean,
+      inputOffset: Int): Option[AggExpr] = {
     aggExpr.aggregateFunction match {
       case s @ Sum(child, _) if sumDataTypeSupported(s.dataType) && isLegacyMode(s) =>
         val childExpr = exprToProto(child, inputs, binding)
@@ -331,6 +332,7 @@ object QueryPlanSerde extends Logging with ShimQueryPlanSerde with CometExprShim
           val firstBuilder = ExprOuterClass.First.newBuilder()
           firstBuilder.setChild(childExpr.get)
           firstBuilder.setDatatype(dataType.get)
+          firstBuilder.setInputOffset(inputOffset)
 
           Some(
             ExprOuterClass.AggExpr
@@ -353,6 +355,7 @@ object QueryPlanSerde extends Logging with ShimQueryPlanSerde with CometExprShim
           val lastBuilder = ExprOuterClass.Last.newBuilder()
           lastBuilder.setChild(childExpr.get)
           lastBuilder.setDatatype(dataType.get)
+          lastBuilder.setInputOffset(inputOffset)
 
           Some(
             ExprOuterClass.AggExpr
@@ -2399,8 +2402,22 @@ object QueryPlanSerde extends Logging with ShimQueryPlanSerde with CometExprShim
           // `output` is only used when `binding` is true (i.e., non-Final)
           val output = child.output
 
-          val aggExprs =
-            aggregateExpressions.map(aggExprToProto(_, output, binding))
+          // In DataFusion some aggregate expressions are implemented using AggregateUDF.
+          // For such expressions, we need to extract its input expressions manually in native
+          // code (see planner.rs). To do that, due to the limitation of DataFusion AggregateUDF
+          // design, we have to get the input offset for each aggregate expression.
+          val aggExprs = if (mode == CometAggregateMode.Final) {
+            aggregateExpressions.map { expr =>
+              val firstAttr = expr.aggregateFunction.inputAggBufferAttributes.head
+              val offset = output.indexWhere(_.exprId == firstAttr.exprId)
+              // scalastyle:off println
+              println(s"Aggregate expression: $expr, offset: $offset")
+              aggregateExpressions.map(aggExprToProto(_, output, binding, offset))
+            }
+          } else {
+            aggregateExpressions.map(aggExprToProto(_, output, binding, -1))
+          }
+
           if (childOp.nonEmpty && groupingExprs.forall(_.isDefined) &&
             aggExprs.forall(_.isDefined)) {
             val hashAggBuilder = OperatorOuterClass.HashAggregate.newBuilder()

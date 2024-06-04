@@ -1358,6 +1358,33 @@ class CometAggregateSuite extends CometTestBase with AdaptiveSparkPlanHelper {
     }
   }
 
+  test("first") {
+    withSQLConf(
+      SQLConf.COALESCE_PARTITIONS_ENABLED.key -> "true",
+      CometConf.COMET_EXEC_SHUFFLE_ENABLED.key -> "true",
+      CometConf.COMET_SHUFFLE_ENFORCE_MODE_ENABLED.key -> "true",
+      CometConf.COMET_SHUFFLE_MODE.key -> "jvm") {
+      Seq(true, false).foreach { dictionary =>
+        withSQLConf("parquet.enable.dictionary" -> dictionary.toString) {
+          val table = "test"
+          withTable(table) {
+            sql(s"create table $table(col1 int, col2 int, col3 int) using parquet")
+            sql(
+              s"insert into $table values(4, 1, 1), (4, 1, 1), (3, 3, 1)," +
+                " (2, 4, 2), (1, 3, 2), (null, 1, 1)")
+            withView("t") {
+              sql("CREATE VIEW t AS SELECT col1, col3 FROM test ORDER BY col1")
+
+              val df = sql("SELECT FIRST(col1) FROM t")
+              df.explain()
+              df.collect()
+            }
+          }
+        }
+      }
+    }
+  }
+
   protected def checkSparkAnswerAndNumOfAggregates(query: String, numAggregates: Int): Unit = {
     val df = sql(query)
     checkSparkAnswer(df)

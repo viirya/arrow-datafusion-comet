@@ -98,6 +98,9 @@ message AggExpr {
     Stddev stddev = 15;
     Correlation correlation = 16;
   }
+
+  // The offset to input batch.
+  int32 input_offset = 17;
 }
 
 enum StatisticsType {
