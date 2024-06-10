@@ -61,7 +61,38 @@ pub fn copy_array(array: &dyn Array) -> ArrayRef {
 
     let mut mutable = MutableArrayData::new(vec![&data], false, capacity);
 
+    if array.data_type() == &DataType::Utf8 {
+        println!(
+            "array: {:?}, len: {}, offset: {}",
+            array.data_type(),
+            array.len(),
+            array.offset()
+        );
+
+        let string = array
+            .as_any()
+            .downcast_ref::<arrow::array::StringArray>()
+            .unwrap();
+        let string_len = string.len();
+        if string.value_offsets()[string_len - 1] >= string.values().len() as i32 {
+            println!(
+                "string_len: {}, array len: {}, values len: {}, string len at {}: {:?}, offset len: {}, offset: {}, {}",
+                string_len,
+                array.len(),
+                string.values().len(),
+                string_len,
+                string.value_length(string_len - 1),
+                string.value_offsets().len(),
+                string.value_offsets()[string_len - 1],
+                string.value_offsets()[string_len]
+            );
+        }
+    }
     mutable.extend(0, 0, capacity);
+
+    if array.data_type() == &DataType::Utf8 {
+        println!("mutable: len: {}", mutable.len());
+    }
 
     if matches!(array.data_type(), DataType::Dictionary(_, _)) {
         let copied_dict = make_array(mutable.freeze());

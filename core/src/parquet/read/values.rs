@@ -513,7 +513,9 @@ macro_rules! make_plain_binary_impl {
 
                     let mut offset_offset = dst.num_values * 4;
                     let offset_buf = &mut dst.value_buffer.as_slice_mut();
+                    // Read the last offset value which points to the end of the last string
                     let mut offset_value = read_num_bytes!(i32, 4, &offset_buf[offset_offset..]);
+                    // Advance the offset to the next position
                     offset_offset += 4;
 
                     // The actual content of a byte array is stored contiguously in the child vector
@@ -521,7 +523,9 @@ macro_rules! make_plain_binary_impl {
                     let mut value_offset = child.num_values; // num_values == num of bytes
 
                     (0..num).for_each(|_| {
+                        // Next source string length
                         let len = read_num_bytes!(i32, 4, &src_data[src_offset..]) as usize;
+                        // Calculate the next offset value
                         offset_value += len as i32;
 
                         // Copy offset for the current string value into the offset buffer
@@ -532,9 +536,13 @@ macro_rules! make_plain_binary_impl {
 
                         if unlikely(value_buf_len < value_offset + len) {
                             let new_capacity = ::std::cmp::max(value_offset + len, value_buf_len * 2);
-                            debug!("Reserving additional space ({} -> {} bytes) for value buffer",
+                            println!("Reserving additional space ({} -> {} bytes) for value buffer",
                                    value_buf_len, new_capacity);
                             child.value_buffer.resize(new_capacity);
+                        }
+
+                        if offset_value > child.value_buffer.len() as i32 {
+                            panic!("Overflow in offset value for binary type");
                         }
 
                         // Copy the actual string content into the value buffer
