@@ -209,7 +209,21 @@ impl ParquetMutableVector {
                 .null_count(self.num_nulls);
 
             if Self::is_binary_type(&self.arrow_type) && self.dictionary.is_none() {
+                let mut offset_offset = self.num_values * 4;
+                let offset_buf = self.value_buffer.as_slice();
+                let offset_value1 = read_num_bytes!(i32, 4, &offset_buf[offset_offset - 4..]);
+                let offset_value2 = read_num_bytes!(i32, 4, &offset_buf[offset_offset - 8..]);
+
                 let child = &mut self.children[0];
+
+                println!(
+                    "binary/string. self.num_values: {}, offset_value1: {}, offset_value2: {}, value_buffer.len: {}",
+                    self.num_values,
+                    offset_value1,
+                    offset_value2,
+                    child.value_buffer.len()
+                );
+
                 builder = builder.add_buffer(child.value_buffer.to_arrow());
             }
 

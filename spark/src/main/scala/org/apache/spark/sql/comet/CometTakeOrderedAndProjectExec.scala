@@ -84,7 +84,7 @@ case class CometTakeOrderedAndProjectExec(
               CometExecUtils
                 .getTopKNativePlan(output, sortOrder, child, limit)
                 .get
-            CometExec.getCometIterator(Seq(iter), topK)
+            CometExec.getCometIterator(Seq(s"take ordered 1: $this"), Seq(iter), topK)
           }
         }
 
@@ -104,7 +104,7 @@ case class CometTakeOrderedAndProjectExec(
         val topKAndProjection = CometExecUtils
           .getProjectionNativePlan(projectList, output, sortOrder, child, limit)
           .get
-        CometExec.getCometIterator(Seq(iter), topKAndProjection)
+        CometExec.getCometIterator(Seq(s"take ordered 2: $this"), Seq(iter), topKAndProjection)
       }
     }
   }

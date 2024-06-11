@@ -42,6 +42,7 @@ import org.apache.comet.vector.NativeUtil
  */
 class CometExecIterator(
     val id: Long,
+    sourceNames: Seq[String],
     inputs: Seq[Iterator[ColumnarBatch]],
     protobufQueryPlan: Array[Byte],
     nativeMetrics: CometMetricNode)
@@ -49,9 +50,12 @@ class CometExecIterator(
 
   private val nativeLib = new Native()
   private val nativeUtil = new NativeUtil
-  private val cometBatchIterators = inputs.map { iterator =>
-    new CometBatchIterator(iterator, nativeUtil)
-  }.toArray
+  private val cometBatchIterators = inputs
+    .zip(sourceNames)
+    .map { case (iterator, source) =>
+      new CometBatchIterator(source, iterator, nativeUtil)
+    }
+    .toArray
   private val plan = {
     val configs = createNativeConf
     nativeLib.createPlan(

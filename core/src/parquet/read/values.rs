@@ -511,6 +511,7 @@ macro_rules! make_plain_binary_impl {
                     let src_data = &src.data;
                     let mut src_offset = src.offset;
 
+                    // The current location of offset in the offset buffer (int32)
                     let mut offset_offset = dst.num_values * 4;
                     let offset_buf = &mut dst.value_buffer.as_slice_mut();
                     // Read the last offset value which points to the end of the last string
@@ -539,6 +540,7 @@ macro_rules! make_plain_binary_impl {
                             println!("Reserving additional space ({} -> {} bytes) for value buffer",
                                    value_buf_len, new_capacity);
                             child.value_buffer.resize(new_capacity);
+                            println!("after resize: {}, offset_value: {}, string len: {}", child.value_buffer.len(), offset_value, len);
                         }
 
                         if offset_value > child.value_buffer.len() as i32 {

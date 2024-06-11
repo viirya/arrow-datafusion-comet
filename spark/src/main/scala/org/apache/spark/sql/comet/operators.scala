@@ -99,12 +99,14 @@ object CometExec {
   def newIterId: Long = curId.getAndIncrement()
 
   def getCometIterator(
+      sourceNames: Seq[String],
       inputs: Seq[Iterator[ColumnarBatch]],
       nativePlan: Operator): CometExecIterator = {
-    getCometIterator(inputs, nativePlan, CometMetricNode(Map.empty))
+    getCometIterator(sourceNames, inputs, nativePlan, CometMetricNode(Map.empty))
   }
 
   def getCometIterator(
+      sourceNames: Seq[String],
       inputs: Seq[Iterator[ColumnarBatch]],
       nativePlan: Operator,
       nativeMetrics: CometMetricNode): CometExecIterator = {
@@ -112,7 +114,7 @@ object CometExec {
     nativePlan.writeTo(outputStream)
     outputStream.close()
     val bytes = outputStream.toByteArray
-    new CometExecIterator(newIterId, inputs, bytes, nativeMetrics)
+    new CometExecIterator(newIterId, sourceNames, inputs, bytes, nativeMetrics)
   }
 
   /**
@@ -213,9 +215,16 @@ abstract class CometNativeExec extends CometExec {
         // TODO: support native metrics for all operators.
         val nativeMetrics = CometMetricNode.fromCometPlan(this)
 
-        def createCometExecIter(inputs: Seq[Iterator[ColumnarBatch]]): CometExecIterator = {
+        def createCometExecIter(
+            sourceNames: Seq[String],
+            inputs: Seq[Iterator[ColumnarBatch]]): CometExecIterator = {
           val it =
-            new CometExecIterator(CometExec.newIterId, inputs, serializedPlanCopy, nativeMetrics)
+            new CometExecIterator(
+              CometExec.newIterId,
+              sourceNames,
+              inputs,
+              serializedPlanCopy,
+              nativeMetrics)
 
           setSubqueries(it.id, originalPlan)
 
@@ -232,6 +241,7 @@ abstract class CometNativeExec extends CometExec {
         // Collect the input ColumnarBatches from the child operators and create a CometExecIterator
         // to execute the native plan.
         val sparkPlans = ArrayBuffer.empty[SparkPlan]
+        val sourceNames = ArrayBuffer.empty[String]
         val inputs = ArrayBuffer.empty[RDD[ColumnarBatch]]
 
         foreachUntilCometInput(this)(sparkPlans += _)
@@ -262,17 +272,22 @@ abstract class CometNativeExec extends CometExec {
         sparkPlans.zipWithIndex.foreach { case (plan, idx) =>
           plan match {
             case c: CometBroadcastExchangeExec =>
+              sourceNames += c.nodeName
               inputs += c.setNumPartitions(firstNonBroadcastPlanNumPartitions).executeColumnar()
             case BroadcastQueryStageExec(_, c: CometBroadcastExchangeExec, _) =>
+              sourceNames += c.nodeName
               inputs += c.setNumPartitions(firstNonBroadcastPlanNumPartitions).executeColumnar()
             case ReusedExchangeExec(_, c: CometBroadcastExchangeExec) =>
+              sourceNames += c.nodeName
               inputs += c.setNumPartitions(firstNonBroadcastPlanNumPartitions).executeColumnar()
             case BroadcastQueryStageExec(
                   _,
                   ReusedExchangeExec(_, c: CometBroadcastExchangeExec),
                   _) =>
+              sourceNames += c.nodeName
               inputs += c.setNumPartitions(firstNonBroadcastPlanNumPartitions).executeColumnar()
             case _ if idx == firstNonBroadcastPlan.get._2 =>
+              sourceNames += firstNonBroadcastPlan.get._1.nodeName
               inputs += firstNonBroadcastPlanRDD
             case _ =>
               val rdd = plan.executeColumnar()
@@ -281,6 +296,7 @@ abstract class CometNativeExec extends CometExec {
                   s"Partition number mismatch: ${rdd.getNumPartitions} != " +
                     s"$firstNonBroadcastPlanNumPartitions")
               } else {
+                sourceNames += plan.nodeName
                 inputs += rdd
               }
           }
@@ -290,7 +306,7 @@ abstract class CometNativeExec extends CometExec {
           throw new CometRuntimeException(s"No input for CometNativeExec:\n $this")
         }
 
-        ZippedPartitionsRDD(sparkContext, inputs.toSeq)(createCometExecIter(_))
+        ZippedPartitionsRDD(sparkContext, inputs.toSeq)(createCometExecIter(sourceNames, _))
     }
   }
 

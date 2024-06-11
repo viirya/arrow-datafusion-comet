@@ -33,10 +33,16 @@ import org.apache.comet.vector.NativeUtil;
 public class CometBatchIterator {
   final Iterator<ColumnarBatch> input;
   final NativeUtil nativeUtil;
+  final String source;
 
-  CometBatchIterator(Iterator<ColumnarBatch> input, NativeUtil nativeUtil) {
+  CometBatchIterator(String source, Iterator<ColumnarBatch> input, NativeUtil nativeUtil) {
+    this.source = source;
     this.input = input;
     this.nativeUtil = nativeUtil;
+  }
+
+  public String name() {
+    return source;
   }
 
   /**

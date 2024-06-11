@@ -28,6 +28,8 @@ pub struct CometBatchIterator<'a> {
     pub class: JClass<'a>,
     pub method_next: JMethodID,
     pub method_next_ret: ReturnType,
+    pub method_name: JMethodID,
+    pub method_name_ret: ReturnType,
 }
 
 impl<'a> CometBatchIterator<'a> {
@@ -41,6 +43,10 @@ impl<'a> CometBatchIterator<'a> {
             class,
             method_next: env.get_method_id(Self::JVM_CLASS, "next", "()[J").unwrap(),
             method_next_ret: ReturnType::Array,
+            method_name: env
+                .get_method_id(Self::JVM_CLASS, "name", "()Ljava/lang/String;")
+                .unwrap(),
+            method_name_ret: ReturnType::Object,
         })
     }
 }

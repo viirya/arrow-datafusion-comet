@@ -26,10 +26,11 @@ use futures::Stream;
 use itertools::Itertools;
 
 use arrow::compute::{cast_with_options, CastOptions};
-use arrow_array::{make_array, ArrayRef, RecordBatch, RecordBatchOptions};
+use arrow_array::{make_array, Array, ArrayRef, RecordBatch, RecordBatchOptions};
 use arrow_data::ArrayData;
 use arrow_schema::{DataType, Field, Schema, SchemaRef};
 
+use crate::jvm_bridge::{jni_static_call, StringWrapper};
 use crate::{
     errors::CometError,
     execution::{
@@ -56,6 +57,8 @@ pub struct ScanExec {
     pub exec_context_id: i64,
     /// The input source of scan node. It is a global reference of JVM `CometBatchIterator` object.
     pub input_source: Option<Arc<GlobalRef>>,
+    /// The name of the input source. Used for debugging.
+    pub source_name: String,
     /// The data types of columns of the input batch. Converted from Spark schema.
     pub data_types: Vec<DataType>,
     /// The input batch of input data. Used to determine the schema of the input data.
@@ -77,6 +80,14 @@ impl ScanExec {
             InputBatch::EOF
         };
 
+        let source_name = if let Some(input_source) = input_source.as_ref() {
+            ScanExec::get_source_name(exec_context_id, input_source.as_obj())?
+        } else {
+            "unit test".to_string()
+        };
+
+        println!("source: {}", source_name);
+
         let schema = scan_schema(&first_batch, &data_types);
 
         let cache = PlanProperties::new(
@@ -88,6 +99,7 @@ impl ScanExec {
         Ok(Self {
             exec_context_id,
             input_source,
+            source_name,
             data_types,
             batch: Arc::new(Mutex::new(Some(first_batch))),
             cache,
@@ -137,6 +149,31 @@ impl ScanExec {
         }
 
         Ok(())
+    }
+
+    fn get_source_name(exec_context_id: i64, iter: &JObject) -> Result<String, CometError> {
+        if exec_context_id == TEST_EXEC_CONTEXT_ID {
+            // This is a unit test. We don't need to call JNI.
+            return Ok("unit test".to_string());
+        }
+
+        let mut env = JVMClasses::get_env();
+
+        if iter.is_null() {
+            return Err(CometError::from(ExecutionError::GeneralError(format!(
+                "Null batch iterator object. Plan id: {}",
+                exec_context_id
+            ))));
+        }
+
+        let string = unsafe {
+            jni_call!(&mut env,
+                comet_batch_iterator(iter).name() -> StringWrapper
+            )?
+        };
+
+        let string = env.get_string(string.get()).unwrap().into();
+        Ok(string)
     }
 
     /// Invokes JNI call to get next batch.
@@ -317,6 +354,34 @@ impl ScanStream {
             .iter()
             .zip(schema_fields.iter())
             .map(|(column, f)| {
+                if column.data_type() == &DataType::Utf8 {
+                    println!(
+                        "scan array: {:?}, len: {}, offset: {}",
+                        column.data_type(),
+                        column.len(),
+                        column.offset()
+                    );
+                    let string = column
+                        .as_any()
+                        .downcast_ref::<arrow::array::StringArray>()
+                        .unwrap();
+                    let string_len = string.len();
+                    if string.value_offsets()[string_len - 1] >= string.values().len() as i32 {
+                        println!(
+                            "scan: {}, string_len: {}, array len: {}, values len: {}, string len at {}: {:?}, offset len: {}, offset: {}, {}",
+                            self.scan.source_name,
+                            string_len,
+                            column.len(),
+                            string.values().len(),
+                            string_len,
+                            string.value_length(string_len - 1),
+                            string.value_offsets().len(),
+                            string.value_offsets()[string_len - 1],
+                            string.value_offsets()[string_len]
+                        );
+                    }
+                }
+
                 if column.data_type() != f.data_type() {
                     cast_with_options(column, f.data_type(), &cast_options).unwrap()
                 } else {

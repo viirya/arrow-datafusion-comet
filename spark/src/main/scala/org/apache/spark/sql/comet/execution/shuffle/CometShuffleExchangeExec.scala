@@ -485,6 +485,7 @@ class CometShuffleWriteProcessor(
     // Getting rid of the fake partitionId
     val newInputs = inputs.asInstanceOf[Iterator[_ <: Product2[Any, Any]]].map(_._2)
     val cometIter = CometExec.getCometIterator(
+      Seq("shuffle writer"),
       Seq(newInputs.asInstanceOf[Iterator[ColumnarBatch]]),
       nativePlan,
       nativeMetrics)
