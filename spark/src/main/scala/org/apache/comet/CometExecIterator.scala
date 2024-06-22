@@ -167,7 +167,7 @@ class CometExecIterator(
         currentBatch.close()
         currentBatch = null
       }
-      nativeLib.releasePlan(plan)
+      // nativeLib.releasePlan(plan)
 
       // The allocator thoughts the exported ArrowArray and ArrowSchema structs are not released,
       // so it will report:
