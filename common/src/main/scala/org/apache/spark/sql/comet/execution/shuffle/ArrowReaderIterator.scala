@@ -41,7 +41,127 @@ class ArrowReaderIterator(channel: ReadableByteChannel, source: String)
     // If it is not released, when closing the reader, arrow library will complain about
     // memory leak.
     if (currentBatch != null) {
+      // scalastyle:off println
+      val usedMem = reader.getAllocator().getAllocatedMemory
+      println("Closing batch: " + usedMem)
+
+      var string = ""
+      for (i <- 0 until currentBatch.numCols()) {
+        currentBatch.column(i) match {
+          case a: CometPlainVector =>
+            val valueVector = a.getValueVector
+
+            string += s"valueVector: $valueVector (${valueVector.getClass.getName})" + "\n"
+
+            val buffers = valueVector.getBuffers(true)
+            buffers.foreach { buffer =>
+              println(s"freeing buffer $i: ${buffer.getReferenceManager.getRefCount}")
+              // buffer.getReferenceManager.release(buffer.getReferenceManager.getRefCount)
+              while (buffer.getReferenceManager.getRefCount > 0) {
+                buffer.close()
+              }
+              println(s"after freeing buffer $i: ${buffer.getReferenceManager.getRefCount}")
+            }
+
+          case a: CometDictionaryVector =>
+            val indices = a.indices
+            val dictionary = a.values
+            string += s"indices: ${indices.getValueVector}, " +
+              s"(${indices.getValueVector.getClass.getName})" + "\n"
+            string += s"dictionary: ${dictionary.getValueVector}" +
+              s"(${dictionary.getValueVector.getClass.getName})" + "\n"
+            string += s"dictionary dictId: ${indices.getValueVector.getField.getDictionary.getId}" +
+              "\n"
+
+            val buffers = indices.getValueVector.getBuffers(true)
+            println(s"buffers: ${buffers.size}")
+
+            buffers.foreach { buffer =>
+              println(s"freeing buffer $i: ${buffer.getReferenceManager.getRefCount}")
+              // buffer.getReferenceManager.release(buffer.getReferenceManager.getRefCount)
+              while (buffer.getReferenceManager.getRefCount > 0) {
+                buffer.close()
+              }
+              println(s"after freeing buffer $i: ${buffer.getReferenceManager.getRefCount}")
+            }
+
+            println(s"dictionary: ${dictionary.getValueVector}")
+
+            val dictBuffers = dictionary.getValueVector.getBuffers(true)
+            println(s"dictBuffers: ${dictBuffers.size}")
+
+            dictBuffers.foreach { buffer =>
+              println(s"freeing dict buffer $i: ${buffer.getReferenceManager.getRefCount}")
+              // buffer.getReferenceManager.release(buffer.getReferenceManager.getRefCount)
+              while (buffer.getReferenceManager.getRefCount > 0) {
+                buffer.close()
+              }
+              println(s"after dict freeing buffer $i: ${buffer.getReferenceManager.getRefCount}")
+            }
+
+          case _ =>
+        }
+      }
+
       currentBatch.close()
+      val freedMem = reader.getAllocator().getAllocatedMemory - usedMem
+      println("After closing: " + reader.getAllocator().getAllocatedMemory)
+      if (freedMem == 0) {
+        println("No memory freed:" + "\n" + string)
+
+        println(s"columns: ${currentBatch.numCols()}")
+        for (i <- 0 until currentBatch.numCols()) {
+          currentBatch.column(i) match {
+            case a: CometPlainVector =>
+              val valueVector = a.getValueVector
+              println(s"valueVector: $valueVector")
+
+              val buffers = valueVector.getBuffers(true)
+              println(s"buffers: ${buffers.size}")
+              buffers.foreach { buffer =>
+                println(s"freeing buffer $i: ${buffer.getReferenceManager.getRefCount}")
+                buffer.close()
+                println(s"after freeing buffer $i: ${buffer.getReferenceManager.getRefCount}")
+              }
+
+              valueVector.close()
+
+            case a: CometDictionaryVector =>
+              val indices = a.indices
+              val dictionary = a.values
+
+              println(s"indices: ${indices.getValueVector}")
+
+              val buffers = indices.getValueVector.getBuffers(true)
+              println(s"buffers: ${buffers.size}")
+
+              buffers.foreach { buffer =>
+                println(s"freeing buffer $i: ${buffer.getReferenceManager.getRefCount}")
+                buffer.close()
+                println(s"after freeing buffer $i: ${buffer.getReferenceManager.getRefCount}")
+              }
+
+              println(s"dictionary: ${dictionary.getValueVector}")
+
+              val dictBuffers = dictionary.getValueVector.getBuffers(true)
+              println(s"dictBuffers: ${dictBuffers.size}")
+
+              dictBuffers.foreach { buffer =>
+                println(s"freeing dict buffer $i: ${buffer.getReferenceManager.getRefCount}")
+                buffer.close()
+                println(
+                  s"after dict freeing buffer $i: ${buffer.getReferenceManager.getRefCount}")
+              }
+
+              indices.getValueVector.close()
+              dictionary.getValueVector.close()
+            case other =>
+              println(s"other: ${other.getClass.getName}")
+          }
+        }
+
+        println("After manual closing: " + reader.getAllocator().getAllocatedMemory)
+      }
     }
 
     batch = nextBatch()

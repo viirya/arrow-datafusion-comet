@@ -21,7 +21,7 @@ package org.apache.comet.vector
 
 import java.nio.channels.ReadableByteChannel
 
-import org.apache.arrow.memory.RootAllocator
+import org.apache.arrow.memory.{BufferAllocator, RootAllocator}
 import org.apache.arrow.vector.VectorSchemaRoot
 import org.apache.arrow.vector.ipc.{ArrowStreamReader, ReadChannel}
 import org.apache.arrow.vector.ipc.message.MessageChannelReader
@@ -36,6 +36,8 @@ case class StreamReader(channel: ReadableByteChannel, source: String) extends Au
   private val channelReader = new MessageChannelReader(new ReadChannel(channel), allocator)
   private var arrowReader = new ArrowStreamReader(channelReader, allocator)
   private var root = arrowReader.getVectorSchemaRoot
+
+  def getAllocator(): BufferAllocator = allocator
 
   def nextBatch(): Option[ColumnarBatch] = {
     if (arrowReader.loadNextBatch()) {
