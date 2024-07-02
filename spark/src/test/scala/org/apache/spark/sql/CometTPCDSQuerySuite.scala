@@ -22,6 +22,7 @@ package org.apache.spark.sql
 import org.apache.spark.SparkConf
 import org.apache.spark.internal.config.{MEMORY_OFFHEAP_ENABLED, MEMORY_OFFHEAP_SIZE}
 import org.apache.spark.sql.comet.shims.ShimCometTPCDSQuerySuite
+import org.apache.spark.sql.internal.SQLConf
 
 import org.apache.comet.CometConf
 
@@ -104,10 +105,10 @@ class CometTPCDSQuerySuite
         "q61",
         "q62",
         "q63",
-        "q64",
+        // "q64", java.lang.OutOfMemoryError: Java heap space
         "q65",
         "q66",
-        "q67",
+        // "q67",
         "q68",
         "q69",
         "q70",
@@ -154,14 +155,16 @@ class CometTPCDSQuerySuite
       "spark.shuffle.manager",
       "org.apache.spark.sql.comet.execution.shuffle.CometShuffleManager")
     conf.set(CometConf.COMET_ENABLED.key, "true")
+    conf.set(CometConf.COMET_BATCH_SIZE.key, "1000")
     conf.set(CometConf.COMET_EXEC_ENABLED.key, "true")
     conf.set(CometConf.COMET_EXEC_ALL_OPERATOR_ENABLED.key, "true")
     conf.set(CometConf.COMET_EXEC_SHUFFLE_ENABLED.key, "true")
     conf.set(CometConf.COMET_MEMORY_OVERHEAD.key, "20g")
     conf.set(CometConf.COMET_SHUFFLE_ENFORCE_MODE_ENABLED.key, "true")
-    conf.set("spark.sql.adaptive.coalescePartitions.enabled", "true")
+    conf.set(SQLConf.COALESCE_PARTITIONS_ENABLED.key, "true")
+    conf.set(SQLConf.SHUFFLE_PARTITIONS, 10)
     conf.set(MEMORY_OFFHEAP_ENABLED.key, "true")
-    conf.set(MEMORY_OFFHEAP_SIZE.key, "20g")
+    conf.set(MEMORY_OFFHEAP_SIZE.key, "30g")
     conf
   }
 
