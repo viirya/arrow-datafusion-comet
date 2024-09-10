@@ -211,6 +211,8 @@ pub struct JVMClasses<'a> {
     pub comet_exec: CometExec<'a>,
     /// The CometBatchIterator class. Used for iterating over the batches.
     pub comet_batch_iterator: CometBatchIterator<'a>,
+    /// The CometRowIterator class. Used for iterating over the rows.
+    pub comet_row_iterator: CometRowIterator<'a>,
     /// The CometTaskMemoryManager used for interacting with JVM side to
     /// acquire & release native memory.
     pub comet_task_memory_manager: CometTaskMemoryManager<'a>,
