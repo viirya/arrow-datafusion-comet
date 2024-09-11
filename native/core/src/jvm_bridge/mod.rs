@@ -182,9 +182,11 @@ pub use comet_exec::*;
 mod batch_iterator;
 mod comet_metric_node;
 mod comet_task_memory_manager;
+mod row_iterator;
 
 use crate::{errors::CometError, JAVA_VM};
 use batch_iterator::CometBatchIterator;
+use row_iterator::CometRowIterator;
 pub use comet_metric_node::*;
 pub use comet_task_memory_manager::*;
 
@@ -266,6 +268,7 @@ impl JVMClasses<'_> {
                 comet_metric_node: CometMetricNode::new(env).unwrap(),
                 comet_exec: CometExec::new(env).unwrap(),
                 comet_batch_iterator: CometBatchIterator::new(env).unwrap(),
+                comet_row_iterator: CometRowIterator::new(env).unwrap(),
                 comet_task_memory_manager: CometTaskMemoryManager::new(env).unwrap(),
             }
         });

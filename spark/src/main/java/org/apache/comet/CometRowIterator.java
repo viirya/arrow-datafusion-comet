@@ -24,36 +24,35 @@ import scala.collection.Iterator;
 import org.apache.spark.sql.catalyst.expressions.UnsafeRow;
 
 /**
- * An iterator that can be used to expose Spark `UnsafeRow` to native execution. It takes
- * an iterator of `UnsafeRow` and returns the address of next `UnsafeRow` in the iterator,
- * which can be used by native code to access the data of the row, once this iterator is
- * consumed by native code.
+ * An iterator that can be used to expose Spark `UnsafeRow` to native execution. It takes an
+ * iterator of `UnsafeRow` and returns the address of next `UnsafeRow` in the iterator, which can be
+ * used by native code to access the data of the row, once this iterator is consumed by native code.
  */
 public class CometRowIterator {
-    final Iterator<UnsafeRow> input;
+  final Iterator<UnsafeRow> input;
 
-    CometRowIterator(Iterator<UnsafeRow> input) {
-        this.input = input;
+  CometRowIterator(Iterator<UnsafeRow> input) {
+    this.input = input;
+  }
+
+  /**
+   * Get the address of next `UnsafeRow`.
+   *
+   * @return the address of `UnsafeRow`. 0 if there is no more row.
+   */
+  public long next() {
+    boolean hasNext = input.hasNext();
+
+    if (!hasNext) {
+      return 0;
     }
 
-    /**
-     * Get the address of next `UnsafeRow`.
-     *
-     * @return the address of `UnsafeRow`. 0 if there is no more row.
-     */
-    public long next() {
-        boolean hasNext = input.hasNext();
+    UnsafeRow row = input.next();
 
-        if (!hasNext) {
-            return 0;
-        }
-
-        UnsafeRow row = input.next();
-
-        if (row.getBaseObject() != null) {
-            throw new IllegalStateException("The row is not in off-heap memory.");
-        }
-
-        return row.getBaseOffset();
+    if (row.getBaseObject() != null) {
+      throw new IllegalStateException("The row is not in off-heap memory.");
     }
+
+    return row.getBaseOffset();
+  }
 }

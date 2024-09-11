@@ -30,13 +30,13 @@ pub struct CometRowIterator<'a> {
     pub method_next_ret: ReturnType,
 }
 
-impl<'a> CometBatchIterator<'a> {
+impl<'a> CometRowIterator<'a> {
     pub const JVM_CLASS: &'static str = "org/apache/comet/CometRowIterator";
 
-    pub fn new(env: &mut JNIEnv<'a>) -> JniResult<CometBatchIterator<'a>> {
+    pub fn new(env: &mut JNIEnv<'a>) -> JniResult<CometRowIterator<'a>> {
         let class = env.find_class(Self::JVM_CLASS)?;
 
-        Ok(CometBatchIterator {
+        Ok(CometRowIterator {
             class,
             method_next: env.get_method_id(Self::JVM_CLASS, "next", "()J")?,
             method_next_ret: ReturnType::Primitive(Primitive::Long),
