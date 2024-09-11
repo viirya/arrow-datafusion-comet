@@ -68,31 +68,41 @@ case class CometRowToColumnarExec(override val output: Seq[Attribute], child: Sp
 
   override protected def doExecuteColumnar(): RDD[ColumnarBatch] = {
     child.execute().mapPartitionsInternal(iter => {
+      val rowIter = new CometRowIterator(iter.asInstanceOf[Iterator[UnsafeRow]]
+
       val nativeUtil = new NativeUtil()
       val nativeLib = new Native()
-      val batch_size = String.valueOf(COMET_BATCH_SIZE.get())
+      val batch_size = String.valueOf(COMET_BATCH_SIZE.get()).toInt
 
       new Iterator[ColumnarBatch] {
-        private val batch = None
+        private var batch: Option[ColumnarBatch] = None
 
         override def hasNext: Boolean = {
           if (batch.isDefined) {
             return true
           }
 
-          nativeUtil.getNextBatch(
+          if (!iter.hasNext) {
+            return false
+          }
+
+          batch = nativeUtil.getNextBatch(
             output.length,
             (arrayAddrs, schemaAddrs) => {
-              nativeLib.rowToColumnar(new CometRowIterator(iter.asInstanceOf[Iterator[UnsafeRow]]), arrayAddrs, schemaAddrs)
+              nativeLib.rowToColumnar(batch_size, rowIter, arrayAddrs, schemaAddrs)
             })
+
+          batch.isDefined
         }
 
-        override def next(): A = {
-          nativeUtil.getNextBatch(
-            output.length,
-            (arrayAddrs, schemaAddrs) => {
-              nativeLib.rowToColumnar(new CometRowIterator(iter.asInstanceOf[Iterator[UnsafeRow]]), arrayAddrs, schemaAddrs)
-            })
+        override def next(): ColumnarBatch = {
+          if (!hasNext) {
+            throw new NoSuchElementException
+          }
+
+          val nextBatch = batch.get
+          batch = None
+          nextBatch
         }
       }
     })

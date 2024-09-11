@@ -133,5 +133,5 @@ class Native extends NativeBase {
    * @return
    *   the number of rows, if -1, it means end of the output.
    */
-  @native def rowToColumnar(row_iter: CometRowIterator, arrayAddrs: Array[Long], schemaAddrs: Array[Long]): Long
+  @native def rowToColumnar(batch_size: Int, row_iter: CometRowIterator, arrayAddrs: Array[Long], schemaAddrs: Array[Long]): Long
 }
