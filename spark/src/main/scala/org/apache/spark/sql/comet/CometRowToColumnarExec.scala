@@ -19,26 +19,24 @@
 
 package org.apache.spark.sql.comet
 
-import org.apache.spark.sql.catalyst.expressions.{Attribute, SortOrder}
+import org.apache.spark.rdd.RDD
+import org.apache.spark.sql.catalyst.InternalRow
+import org.apache.spark.sql.catalyst.expressions.{Attribute, SortOrder, UnsafeRow}
 import org.apache.spark.sql.catalyst.plans.physical.Partitioning
 import org.apache.spark.sql.execution.{RowToColumnarTransition, SparkPlan}
-
+import org.apache.spark.sql.vectorized.ColumnarBatch
 import com.google.common.base.Objects
-
-import org.apache.comet.serde.OperatorOuterClass.Operator
+import org.apache.comet.CometConf.COMET_BATCH_SIZE
+import org.apache.comet.vector.NativeUtil
+import org.apache.comet.{CometRowIterator, Native}
 
 /**
  * Comet physical plan node for Spark `RowToColumnarExec`.
  *
  * This is used to execute a `RowToColumnarExec` physical operator by using Comet native engine.
  */
-case class CometRowToColumnarExec(
-    override val nativeOp: Operator,
-    override val originalPlan: SparkPlan,
-    override val output: Seq[Attribute],
-    child: SparkPlan,
-    override val serializedPlanOpt: SerializedPlan)
-    extends CometUnaryExec
+case class CometRowToColumnarExec(override val output: Seq[Attribute], child: SparkPlan)
+    extends CometPlan
     with RowToColumnarTransition {
 
   override def nodeName: String = "CometRowToColumnarExec"
@@ -59,11 +57,46 @@ case class CometRowToColumnarExec(
       case other: CometRowToColumnarExec =>
         this.output == other.output &&
         this.child == other.child &&
-        this.serializedPlanOpt == other.serializedPlanOpt
       case _ =>
         false
     }
   }
 
   override def hashCode(): Int = Objects.hashCode(output, child)
+
+  override protected def doExecute(): RDD[InternalRow] = throw new UnsupportedOperationException
+
+  override protected def doExecuteColumnar(): RDD[ColumnarBatch] = {
+    child.execute().mapPartitionsInternal(iter => {
+      val nativeUtil = new NativeUtil()
+      val nativeLib = new Native()
+      val batch_size = String.valueOf(COMET_BATCH_SIZE.get())
+
+      new Iterator[ColumnarBatch] {
+        private val batch = None
+
+        override def hasNext: Boolean = {
+          if (batch.isDefined) {
+            return true
+          }
+
+          nativeUtil.getNextBatch(
+            output.length,
+            (arrayAddrs, schemaAddrs) => {
+              nativeLib.rowToColumnar(new CometRowIterator(iter.asInstanceOf[Iterator[UnsafeRow]]), arrayAddrs, schemaAddrs)
+            })
+        }
+
+        override def next(): A = {
+          nativeUtil.getNextBatch(
+            output.length,
+            (arrayAddrs, schemaAddrs) => {
+              nativeLib.rowToColumnar(new CometRowIterator(iter.asInstanceOf[Iterator[UnsafeRow]]), arrayAddrs, schemaAddrs)
+            })
+        }
+      }
+    })
+  }
 }
+
+
