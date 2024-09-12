@@ -25,10 +25,12 @@ import org.apache.spark.sql.catalyst.expressions.{Attribute, SortOrder, UnsafeRo
 import org.apache.spark.sql.catalyst.plans.physical.Partitioning
 import org.apache.spark.sql.execution.{RowToColumnarTransition, SparkPlan}
 import org.apache.spark.sql.vectorized.ColumnarBatch
+
 import com.google.common.base.Objects
+
+import org.apache.comet.{CometRowIterator, Native}
 import org.apache.comet.CometConf.COMET_BATCH_SIZE
 import org.apache.comet.vector.NativeUtil
-import org.apache.comet.{CometRowIterator, Native}
 
 /**
  * Comet physical plan node for Spark `RowToColumnarExec`.
@@ -56,7 +58,7 @@ case class CometRowToColumnarExec(override val output: Seq[Attribute], child: Sp
     obj match {
       case other: CometRowToColumnarExec =>
         this.output == other.output &&
-        this.child == other.child &&
+        this.child == other.child
       case _ =>
         false
     }
@@ -67,46 +69,46 @@ case class CometRowToColumnarExec(override val output: Seq[Attribute], child: Sp
   override protected def doExecute(): RDD[InternalRow] = throw new UnsupportedOperationException
 
   override protected def doExecuteColumnar(): RDD[ColumnarBatch] = {
-    child.execute().mapPartitionsInternal(iter => {
-      val rowIter = new CometRowIterator(iter.asInstanceOf[Iterator[UnsafeRow]]
+    child
+      .execute()
+      .mapPartitionsInternal(iter => {
+        val rowIter = new CometRowIterator(iter.asInstanceOf[Iterator[UnsafeRow]])
 
-      val nativeUtil = new NativeUtil()
-      val nativeLib = new Native()
-      val batch_size = String.valueOf(COMET_BATCH_SIZE.get()).toInt
+        val nativeUtil = new NativeUtil()
+        val nativeLib = new Native()
+        val batch_size = String.valueOf(COMET_BATCH_SIZE.get()).toInt
 
-      new Iterator[ColumnarBatch] {
-        private var batch: Option[ColumnarBatch] = None
+        new Iterator[ColumnarBatch] {
+          private var batch: Option[ColumnarBatch] = None
 
-        override def hasNext: Boolean = {
-          if (batch.isDefined) {
-            return true
+          override def hasNext: Boolean = {
+            if (batch.isDefined) {
+              return true
+            }
+
+            if (!iter.hasNext) {
+              return false
+            }
+
+            batch = nativeUtil.getNextBatch(
+              output.length,
+              (arrayAddrs, schemaAddrs) => {
+                nativeLib.rowToColumnar(batch_size, rowIter, arrayAddrs, schemaAddrs)
+              })
+
+            batch.isDefined
           }
 
-          if (!iter.hasNext) {
-            return false
+          override def next(): ColumnarBatch = {
+            if (!hasNext) {
+              throw new NoSuchElementException
+            }
+
+            val nextBatch = batch.get
+            batch = None
+            nextBatch
           }
-
-          batch = nativeUtil.getNextBatch(
-            output.length,
-            (arrayAddrs, schemaAddrs) => {
-              nativeLib.rowToColumnar(batch_size, rowIter, arrayAddrs, schemaAddrs)
-            })
-
-          batch.isDefined
         }
-
-        override def next(): ColumnarBatch = {
-          if (!hasNext) {
-            throw new NoSuchElementException
-          }
-
-          val nextBatch = batch.get
-          batch = None
-          nextBatch
-        }
-      }
-    })
+      })
   }
 }
-
-

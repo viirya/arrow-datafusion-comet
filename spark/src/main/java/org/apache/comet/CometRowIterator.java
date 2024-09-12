@@ -31,7 +31,7 @@ import org.apache.spark.sql.catalyst.expressions.UnsafeRow;
 public class CometRowIterator {
   final Iterator<UnsafeRow> input;
 
-  CometRowIterator(Iterator<UnsafeRow> input) {
+  public CometRowIterator(Iterator<UnsafeRow> input) {
     this.input = input;
   }
 

@@ -126,12 +126,19 @@ class Native extends NativeBase {
 
   /**
    * Convert rows from a row-based iterator to Arrow batches
-   * @param row_iter row-based iterator
-   * @param arrayAddrs the addresses of Arrow Array structures
-   * @param schemaAddrs the addresses of Arrow Schema structures
+   * @param row_iter
+   *   row-based iterator
+   * @param arrayAddrs
+   *   the addresses of Arrow Array structures
+   * @param schemaAddrs
+   *   the addresses of Arrow Schema structures
    *
    * @return
    *   the number of rows, if -1, it means end of the output.
    */
-  @native def rowToColumnar(batch_size: Int, row_iter: CometRowIterator, arrayAddrs: Array[Long], schemaAddrs: Array[Long]): Long
+  @native def rowToColumnar(
+      batch_size: Int,
+      row_iter: CometRowIterator,
+      arrayAddrs: Array[Long],
+      schemaAddrs: Array[Long]): Long
 }

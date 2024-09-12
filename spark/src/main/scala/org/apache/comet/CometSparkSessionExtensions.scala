@@ -825,8 +825,9 @@ class CometSparkSessionExtensions
           withInfo(s, Seq(msg1, msg2, msg3).flatten.mkString(","))
           s
 
-        case op: RowToColumnarExec =>
-          CometRowToColumnarExec(nativeOp, op, op.output, op.child, SerializedPlan(None))
+        case op: RowToColumnarExec
+            if op.output.forall(a => QueryPlanSerde.rowColumnarSupportedDataType(a.dataType)) =>
+          CometRowToColumnarExec(op.output, op.child)
 
         case op =>
           op match {

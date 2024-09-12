@@ -3122,55 +3122,60 @@ object QueryPlanSerde extends Logging with ShimQueryPlanSerde with CometExprShim
   }
 
   /**
+   * Whether the given datatype is supported by native Spark row to columnar conversion. It is
+   * used by Columnar shuffle and native RowToColumnar operator.
+   */
+  def rowColumnarSupportedDataType(dt: DataType): Boolean = dt match {
+    case _: ByteType | _: ShortType | _: IntegerType | _: LongType | _: FloatType |
+        _: DoubleType | _: StringType | _: BinaryType | _: TimestampType | _: DecimalType |
+        _: DateType | _: BooleanType =>
+      true
+    case StructType(fields) =>
+      fields.forall(f => rowColumnarSupportedDataType(f.dataType)) &&
+      // Java Arrow stream reader cannot work on duplicate field name
+      fields.map(f => f.name).distinct.length == fields.length
+    case ArrayType(ArrayType(_, _), _) => false // TODO: nested array is not supported
+    case ArrayType(MapType(_, _, _), _) => false // TODO: map array element is not supported
+    case ArrayType(elementType, _) =>
+      rowColumnarSupportedDataType(elementType)
+    case MapType(MapType(_, _, _), _, _) => false // TODO: nested map is not supported
+    case MapType(_, MapType(_, _, _), _) => false
+    case MapType(StructType(_), _, _) => false // TODO: struct map key/value is not supported
+    case MapType(_, StructType(_), _) => false
+    case MapType(ArrayType(_, _), _, _) => false // TODO: array map key/value is not supported
+    case MapType(_, ArrayType(_, _), _) => false
+    case MapType(keyType, valueType, _) =>
+      rowColumnarSupportedDataType(keyType) && rowColumnarSupportedDataType(valueType)
+    case _ =>
+      false
+  }
+
+  /**
    * Check if the datatypes of shuffle input are supported. This is used for Columnar shuffle
    * which supports struct/array.
    */
   def supportPartitioningTypes(
       inputs: Seq[Attribute],
       partitioning: Partitioning): (Boolean, String) = {
-    def supportedDataType(dt: DataType): Boolean = dt match {
-      case _: ByteType | _: ShortType | _: IntegerType | _: LongType | _: FloatType |
-          _: DoubleType | _: StringType | _: BinaryType | _: TimestampType | _: DecimalType |
-          _: DateType | _: BooleanType =>
-        true
-      case StructType(fields) =>
-        fields.forall(f => supportedDataType(f.dataType)) &&
-        // Java Arrow stream reader cannot work on duplicate field name
-        fields.map(f => f.name).distinct.length == fields.length
-      case ArrayType(ArrayType(_, _), _) => false // TODO: nested array is not supported
-      case ArrayType(MapType(_, _, _), _) => false // TODO: map array element is not supported
-      case ArrayType(elementType, _) =>
-        supportedDataType(elementType)
-      case MapType(MapType(_, _, _), _, _) => false // TODO: nested map is not supported
-      case MapType(_, MapType(_, _, _), _) => false
-      case MapType(StructType(_), _, _) => false // TODO: struct map key/value is not supported
-      case MapType(_, StructType(_), _) => false
-      case MapType(ArrayType(_, _), _, _) => false // TODO: array map key/value is not supported
-      case MapType(_, ArrayType(_, _), _) => false
-      case MapType(keyType, valueType, _) =>
-        supportedDataType(keyType) && supportedDataType(valueType)
-      case _ =>
-        false
-    }
-
     var msg = ""
     val supported = partitioning match {
       case HashPartitioning(expressions, _) =>
         val supported =
           expressions.map(QueryPlanSerde.exprToProto(_, inputs)).forall(_.isDefined) &&
-            expressions.forall(e => supportedDataType(e.dataType)) &&
-            inputs.forall(attr => supportedDataType(attr.dataType))
+            expressions.forall(e => rowColumnarSupportedDataType(e.dataType)) &&
+            inputs.forall(attr => rowColumnarSupportedDataType(attr.dataType))
         if (!supported) {
           msg = s"unsupported Spark partitioning expressions: $expressions"
         }
         supported
-      case SinglePartition => inputs.forall(attr => supportedDataType(attr.dataType))
-      case RoundRobinPartitioning(_) => inputs.forall(attr => supportedDataType(attr.dataType))
+      case SinglePartition => inputs.forall(attr => rowColumnarSupportedDataType(attr.dataType))
+      case RoundRobinPartitioning(_) =>
+        inputs.forall(attr => rowColumnarSupportedDataType(attr.dataType))
       case RangePartitioning(orderings, _) =>
         val supported =
           orderings.map(QueryPlanSerde.exprToProto(_, inputs)).forall(_.isDefined) &&
-            orderings.forall(e => supportedDataType(e.dataType)) &&
-            inputs.forall(attr => supportedDataType(attr.dataType))
+            orderings.forall(e => rowColumnarSupportedDataType(e.dataType)) &&
+            inputs.forall(attr => rowColumnarSupportedDataType(attr.dataType))
         if (!supported) {
           msg = s"unsupported Spark partitioning expressions: $orderings"
         }
