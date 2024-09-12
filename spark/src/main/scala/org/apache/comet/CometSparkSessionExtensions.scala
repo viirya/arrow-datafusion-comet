@@ -825,10 +825,6 @@ class CometSparkSessionExtensions
           withInfo(s, Seq(msg1, msg2, msg3).flatten.mkString(","))
           s
 
-        case op: RowToColumnarExec
-            if op.output.forall(a => QueryPlanSerde.rowColumnarSupportedDataType(a.dataType)) =>
-          CometRowToColumnarExec(op.output, op.child)
-
         case op =>
           op match {
             case _: CometExec | _: AQEShuffleReadExec | _: BroadcastExchangeExec |
@@ -1004,6 +1000,10 @@ class CometSparkSessionExtensions
               CometColumnarShuffle,
               _) =>
           s.withNewChildren(Seq(child))
+
+        case op: RowToColumnarExec
+            if op.output.forall(a => QueryPlanSerde.rowColumnarSupportedDataType(a.dataType)) =>
+          CometRowToColumnarExec(op.output, op.child)
       }
 
       eliminatedPlan match {

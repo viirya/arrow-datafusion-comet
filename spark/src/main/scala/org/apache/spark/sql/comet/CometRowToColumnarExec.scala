@@ -41,7 +41,7 @@ case class CometRowToColumnarExec(override val output: Seq[Attribute], child: Sp
     extends CometPlan
     with RowToColumnarTransition {
 
-  override def nodeName: String = "CometRowToColumnarExec"
+  override def nodeName: String = "CometRowToColumnar"
 
   override def outputOrdering: Seq[SortOrder] = child.outputOrdering
 
