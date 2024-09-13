@@ -19,6 +19,7 @@
 
 package org.apache.spark.sql.comet
 
+import org.apache.spark.broadcast
 import org.apache.spark.rdd.RDD
 import org.apache.spark.sql.catalyst.InternalRow
 import org.apache.spark.sql.catalyst.expressions.{Attribute, SortOrder, UnsafeRow}
@@ -66,9 +67,17 @@ case class CometRowToColumnarExec(override val output: Seq[Attribute], child: Sp
 
   override def hashCode(): Int = Objects.hashCode(output, child)
 
-  override protected def doExecute(): RDD[InternalRow] = throw new UnsupportedOperationException
+  override def doExecute(): RDD[InternalRow] = {
+    child.execute()
+  }
+
+  override def doExecuteBroadcast[T](): broadcast.Broadcast[T] = {
+    child.doExecuteBroadcast()
+  }
 
   override protected def doExecuteColumnar(): RDD[ColumnarBatch] = {
+    // scalastyle:off println
+    println("CometRowToColumnarExec")
     child
       .execute()
       .mapPartitionsInternal(iter => {
