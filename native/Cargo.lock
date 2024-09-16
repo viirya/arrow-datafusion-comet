@@ -911,6 +911,7 @@ dependencies = [
  "pprof",
  "prost 0.12.6",
  "rand",
+ "rayon",
  "regex",
  "serde",
  "simd-adler32",

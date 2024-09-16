@@ -39,6 +39,8 @@ use jni::{
 };
 use std::{collections::HashMap, sync::Arc, task::Poll};
 
+use rayon::prelude::*;
+
 use super::{serde, utils::SparkArrowConvert, CometMemoryPool};
 
 use crate::{
@@ -322,7 +324,7 @@ fn prepare_output(
 /// operators before polling the stream,
 #[inline]
 fn pull_input_batches(exec_context: &mut ExecutionContext) -> Result<(), CometError> {
-    exec_context.scans.iter_mut().try_for_each(|scan| {
+    exec_context.scans.par_iter_mut().try_for_each(|scan| {
         scan.get_next_batch()?;
         Ok::<(), CometError>(())
     })
