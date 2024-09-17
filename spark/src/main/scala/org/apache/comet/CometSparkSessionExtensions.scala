@@ -1000,7 +1000,9 @@ class CometSparkSessionExtensions
               CometColumnarShuffle,
               _) =>
           s.withNewChildren(Seq(child))
+      }
 
+      eliminatedPlan.transformUp {
         case op: RowToColumnarExec
             if op.output.forall(a => QueryPlanSerde.rowColumnarSupportedDataType(a.dataType)) =>
           CometRowToColumnarExec(op.output, op.child)
