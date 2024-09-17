@@ -331,9 +331,9 @@ class CometSparkSessionExtensions
           val nativeOps = op.children.map {
             case c: CometNativeExec => c.nativeOp
             case c =>
-              val pseudoScan = QueryPlanSerde.operator2Proto(CometRowToColumnarExec(c.output, c))
-              if (pseudoScan.isDefined) {
-                pseudoScan.get
+              val scanOp = QueryPlanSerde.operator2Proto(CometRowToColumnarExec(c.output, c))
+              if (scanOp.isDefined) {
+                scanOp.get
               } else {
                 withInfo(
                   op,
@@ -1023,13 +1023,13 @@ class CometSparkSessionExtensions
           s.withNewChildren(Seq(child))
       }
 
-      eliminatedPlan.transformUp {
+      val newPlan = eliminatedPlan.transformUp {
         case op: RowToColumnarExec
             if op.output.forall(a => QueryPlanSerde.rowColumnarSupportedDataType(a.dataType)) =>
           CometRowToColumnarExec(op.output, op.child)
       }
 
-      eliminatedPlan match {
+      newPlan match {
         case ColumnarToRowExec(child: CometCollectLimitExec) =>
           child
         case other =>

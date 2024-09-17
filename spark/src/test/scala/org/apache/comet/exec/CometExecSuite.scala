@@ -64,6 +64,32 @@ class CometExecSuite extends CometTestBase {
     }
   }
 
+  test("project on top of native row to columnar") {
+    withSQLConf(
+      CometConf.COMET_EXEC_FILTER_ENABLED.key -> "false",
+      CometConf.COMET_ROW_TO_COLUMNAR_ENABLED.key -> "true") {
+      withParquetTable((0 until 5).map(i => (i, i + 1)), "tbl") {
+        val df = sql("SELECT _1 + 1, _2 + 2 FROM tbl WHERE _1 > 3")
+        df.explain()
+
+        // The query looks like:
+        // +- CometProject [(_1 + 1)#10, (_2 + 2)#11], [(_1#6 + 1) AS (_1 + 1)#10, (_2#7 + 2) AS (_2 + 2)#11]
+        //   +- CometRowToColumnar [_1#6, _2#7]
+        //      +- *(1) Filter (isnotnull(_1#6) AND (_1#6 > 3))
+        //         +- *(1) ColumnarToRow
+        //            +- CometScan parquet [_1#6,_2#7] Batched: true, ReadSchema: struct<_1:int,_2:int>
+        //
+        // Although `Filter` is not native, we still can get `CometProject` on top of `CometRowToColumnar`
+        // because `COMET_ROW_TO_COLUMNAR_ENABLED` is enabled.
+        val cometProject = stripAQEPlan(df.queryExecution.executedPlan).collectFirst {
+          case p: CometProjectExec => p
+        }
+        assert(cometProject.isDefined)
+        // checkSparkAnswerAndOperator(df)
+      }
+    }
+  }
+
   test("DPP fallback") {
     withTempDir { path =>
       // create test data
