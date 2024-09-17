@@ -157,6 +157,17 @@ object CometConf extends ShimCometConf {
       defaultValue = true,
       notes = Some("stddev is slower than Spark's implementation"))
 
+  val COMET_ROW_TO_COLUMNAR_ENABLED: ConfigEntry[Boolean] =
+    conf("spark.comet.rowToColumnar.enabled")
+      .doc(
+        "Whether to enable native row to columnar conversion for Comet. When this is turned on, " +
+          "Comet will convert Spark row-based data to columnar format before executing native " +
+          "operators. This feature will increases the query coverage of Comet, " +
+          "but it also brings more row/columnar conversion in query plan. " +
+          "By default, this config is false.")
+      .booleanConf
+      .createWithDefault(false)
+
   val COMET_MEMORY_OVERHEAD: OptionalConfigEntry[Long] = conf("spark.comet.memoryOverhead")
     .doc(
       "The amount of additional memory to be allocated per executor process for Comet, in MiB. " +

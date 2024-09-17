@@ -319,10 +319,31 @@ class CometSparkSessionExtensions
     // spotless:on
     private def transform(plan: SparkPlan): SparkPlan = {
       def transform1(op: SparkPlan): Option[Operator] = {
+        // Comet can transform a Spark operator to Comet native operator if
+        // 1. all its children are Comet native operators, or
+        // 2. `COMET_ROW_TO_COLUMNAR_ENABLED` is enabled so that Comet can add a row-to-columnar
+        //    conversion operator before the current operator.
         if (op.children.forall(_.isInstanceOf[CometNativeExec])) {
           QueryPlanSerde.operator2Proto(
             op,
             op.children.map(_.asInstanceOf[CometNativeExec].nativeOp): _*)
+        } else if (CometConf.COMET_ROW_TO_COLUMNAR_ENABLED.get(conf)) {
+          val nativeOps = op.children.map {
+            case c: CometNativeExec => c.nativeOp
+            case c =>
+              val pseudoScan = QueryPlanSerde.operator2Proto(CometRowToColumnarExec(c.output, c))
+              if (pseudoScan.isDefined) {
+                pseudoScan.get
+              } else {
+                withInfo(
+                  op,
+                  s"${op.nodeName} is not native because the following children are not native " +
+                    "or cannot be supported by CometRowToColumnarExec: " +
+                    s"${explainChildNotNative(op)}")
+                return None
+              }
+          }
+          QueryPlanSerde.operator2Proto(op, nativeOps: _*)
         } else {
           withInfo(
             op,
