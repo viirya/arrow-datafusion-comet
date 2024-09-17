@@ -138,6 +138,7 @@ class Native extends NativeBase {
    */
   @native def rowToColumnar(
       batch_size: Int,
+      datatypes: Array[Array[Byte]],
       row_iter: CometRowIterator,
       arrayAddrs: Array[Long],
       schemaAddrs: Array[Long]): Long

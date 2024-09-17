@@ -52,6 +52,7 @@ use crate::{
 use datafusion_comet_proto::spark_operator::Operator;
 use datafusion_common::ScalarValue;
 use futures::stream::StreamExt;
+use jni::sys::jobject;
 use jni::{
     objects::GlobalRef,
     sys::{jboolean, jdouble, jintArray, jobjectArray, jstring},
@@ -562,5 +563,38 @@ pub extern "system" fn Java_org_apache_comet_Native_sortRowPartitionsNative(
         array.rdxsort();
 
         Ok(())
+    })
+}
+
+#[no_mangle]
+/// Executes to convert Spark UnsafeRow to Arrow arrays
+pub extern "system" fn Java_org_apache_comet_Native_rowToColumnar(
+    e: JNIEnv,
+    _class: JClass,
+    batch_size: jint,
+    serialized_datatypes: jobjectArray,
+    row_iter: jobject,
+    array_addrs: jlongArray,
+    schema_addrs: jlongArray,
+) -> jlong {
+    try_unwrap_or_throw(&e, |mut env| {
+        let array_address_array = unsafe { JLongArray::from_raw(array_addrs) };
+        let num_cols = env.get_array_length(&array_address_array)? as usize;
+
+        let array_addrs =
+            unsafe { env.get_array_elements(&array_address_array, ReleaseMode::NoCopyBack)? };
+        let array_addrs = &*array_addrs;
+
+        let schema_address_array = unsafe { JLongArray::from_raw(schema_addrs) };
+        let schema_addrs =
+            unsafe { env.get_array_elements(&schema_address_array, ReleaseMode::NoCopyBack)? };
+        let schema_addrs = &*schema_addrs;
+
+        let data_types = convert_datatype_arrays(&mut env, serialized_datatypes)?;
+
+        let row_iter = Arc::new(jni_new_global_ref!(env, row_iter)?);
+        let row_iter_obj: &JObject = row_iter.as_obj();
+
+        Ok(0)
     })
 }

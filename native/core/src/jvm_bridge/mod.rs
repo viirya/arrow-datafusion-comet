@@ -186,9 +186,9 @@ mod row_iterator;
 
 use crate::{errors::CometError, JAVA_VM};
 use batch_iterator::CometBatchIterator;
-use row_iterator::CometRowIterator;
 pub use comet_metric_node::*;
 pub use comet_task_memory_manager::*;
+use row_iterator::CometRowIterator;
 
 /// The JVM classes that are used in the JNI calls.
 pub struct JVMClasses<'a> {

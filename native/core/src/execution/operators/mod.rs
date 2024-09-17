@@ -28,6 +28,7 @@ pub use scan::*;
 
 mod copy;
 mod filter;
+mod row_to_columnar;
 mod scan;
 
 /// Error returned during executing operators.

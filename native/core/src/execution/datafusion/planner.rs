@@ -1132,7 +1132,7 @@ impl PhysicalPlanner {
                     )?),
                 ))
             }
-            OpStruct::RowToColumnar(_) => todo!()
+            OpStruct::RowToColumnar(_) => todo!(),
         }
     }
 
