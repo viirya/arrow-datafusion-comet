@@ -375,7 +375,7 @@ pub unsafe extern "system" fn Java_org_apache_comet_Native_executePlan(
             exec_context.stream = Some(stream);
         } else {
             // Pull input batches
-            pull_input_batches(exec_context)?;
+            // pull_input_batches(exec_context)?;
         }
 
         loop {
@@ -416,7 +416,7 @@ pub unsafe extern "system" fn Java_org_apache_comet_Native_executePlan(
                     update_metrics(&mut env, exec_context)?;
 
                     // Pull input batches
-                    pull_input_batches(exec_context)?;
+                    // pull_input_batches(exec_context)?;
 
                     // Output not ready yet
                     continue;
