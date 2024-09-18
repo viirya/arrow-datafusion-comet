@@ -573,7 +573,7 @@ pub extern "system" fn Java_org_apache_comet_Native_rowToColumnar(
     _class: JClass,
     batch_size: jint,
     serialized_datatypes: jobjectArray,
-    row_iter: jobject,
+    row_iter: JObject,
     array_addrs: jlongArray,
     schema_addrs: jlongArray,
 ) -> jlong {

@@ -25,12 +25,14 @@ import org.apache.spark.sql.catalyst.InternalRow
 import org.apache.spark.sql.catalyst.expressions.{Attribute, SortOrder, UnsafeRow}
 import org.apache.spark.sql.catalyst.plans.physical.Partitioning
 import org.apache.spark.sql.execution.{RowToColumnarTransition, SparkPlan}
+import org.apache.spark.sql.types.StructType
 import org.apache.spark.sql.vectorized.ColumnarBatch
 
 import com.google.common.base.Objects
 
 import org.apache.comet.{CometRowIterator, Native}
 import org.apache.comet.CometConf.COMET_BATCH_SIZE
+import org.apache.comet.serde.QueryPlanSerde
 import org.apache.comet.vector.NativeUtil
 
 /**
@@ -78,6 +80,7 @@ case class CometRowToColumnarExec(override val output: Seq[Attribute], child: Sp
   override protected def doExecuteColumnar(): RDD[ColumnarBatch] = {
     // scalastyle:off println
     println("CometRowToColumnarExec")
+    val schema = QueryPlanSerde.serializeSchema(StructType.fromAttributes(output))
     child
       .execute()
       .mapPartitionsInternal(iter => {
@@ -102,7 +105,7 @@ case class CometRowToColumnarExec(override val output: Seq[Attribute], child: Sp
             batch = nativeUtil.getNextBatch(
               output.length,
               (arrayAddrs, schemaAddrs) => {
-                nativeLib.rowToColumnar(batch_size, rowIter, arrayAddrs, schemaAddrs)
+                nativeLib.rowToColumnar(batch_size, schema, rowIter, arrayAddrs, schemaAddrs)
               })
 
             batch.isDefined

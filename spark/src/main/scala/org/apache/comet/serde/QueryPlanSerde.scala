@@ -19,6 +19,8 @@
 
 package org.apache.comet.serde
 
+import java.io.{ByteArrayOutputStream, IOException}
+
 import scala.collection.JavaConverters._
 
 import org.apache.spark.internal.Logging
@@ -3282,5 +3284,21 @@ object QueryPlanSerde extends Logging with ShimQueryPlanSerde with CometExprShim
     } else {
       true
     }
+  }
+
+  /** Serialize row schema to byte array. */
+  def serializeSchema(schema: StructType): Array[Array[Byte]] = {
+    val dataTypes = new Array[Array[Byte]](schema.length)
+    for (i <- 0 until schema.length) {
+      val outputStream = new ByteArrayOutputStream
+      try {
+        QueryPlanSerde.serializeDataType(schema.apply(i).dataType).get.writeTo(outputStream)
+      } catch {
+        case e: IOException =>
+          throw new RuntimeException(e)
+      }
+      dataTypes(i) = outputStream.toByteArray
+    }
+    dataTypes
   }
 }
