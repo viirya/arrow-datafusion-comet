@@ -3373,7 +3373,7 @@ pub fn process_sorted_row_partition(
     Ok((written as i64, current_checksum.map(|c| c.finalize())))
 }
 
-fn builder_to_array(
+pub(crate) fn builder_to_array(
     builder: &mut Box<dyn ArrayBuilder>,
     datatype: &DataType,
     prefer_dictionary_ratio: f64,

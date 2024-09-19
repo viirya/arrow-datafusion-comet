@@ -19,7 +19,10 @@
 
 package org.apache.spark.sql.comet
 
+import scala.collection.mutable.ArrayBuffer
+
 import org.apache.spark.broadcast
+import org.apache.spark.internal.config.MEMORY_OFFHEAP_ENABLED
 import org.apache.spark.rdd.RDD
 import org.apache.spark.sql.catalyst.InternalRow
 import org.apache.spark.sql.catalyst.expressions.{Attribute, SortOrder, UnsafeRow}
@@ -39,6 +42,9 @@ import org.apache.comet.vector.NativeUtil
  * Comet physical plan node for Spark `RowToColumnarExec`.
  *
  * This is used to execute a `RowToColumnarExec` physical operator by using Comet native engine.
+ *
+ * Note that this requires Spark using off-heap memory mode because it will pass memory addresses
+ * of the input rows to the native engine.
  */
 case class CometRowToColumnarExec(override val output: Seq[Attribute], child: SparkPlan)
     extends CometPlan
@@ -78,13 +84,19 @@ case class CometRowToColumnarExec(override val output: Seq[Attribute], child: Sp
   }
 
   override protected def doExecuteColumnar(): RDD[ColumnarBatch] = {
+    if (!sparkContext.getConf.get(MEMORY_OFFHEAP_ENABLED)) {
+      throw new IllegalStateException(
+        "CometRowToColumnarExec requires Spark to use off-heap memory mode.")
+    }
+
     // scalastyle:off println
-    println("CometRowToColumnarExec")
+    println("CometRowToColumnarExec: doExecuteColumnar")
+    println("off-heap enabled: " + sparkContext.getConf.get(MEMORY_OFFHEAP_ENABLED))
     val schema = QueryPlanSerde.serializeSchema(StructType.fromAttributes(output))
     child
       .execute()
       .mapPartitionsInternal(iter => {
-        val rowIter = new CometRowIterator(iter.asInstanceOf[Iterator[UnsafeRow]])
+        val rowIter = iter.asInstanceOf[Iterator[UnsafeRow]]
 
         val nativeUtil = new NativeUtil()
         val nativeLib = new Native()
@@ -92,6 +104,29 @@ case class CometRowToColumnarExec(override val output: Seq[Attribute], child: Sp
 
         new Iterator[ColumnarBatch] {
           private var batch: Option[ColumnarBatch] = None
+
+          def getRowInfo(): (Array[Long], Array[Int]) = {
+            val rowAddrs = new ArrayBuffer[Long](batch_size)
+            val rowSizes = new ArrayBuffer[Int](batch_size)
+
+            var count = 0
+            rowIter.foreach { row =>
+              // scalastyle:off println
+              println("row: " + row.getBaseObject)
+
+              val addr = row.getBaseOffset()
+              val size = row.getSizeInBytes()
+              rowAddrs += addr
+              rowSizes += size
+
+              count += 1
+              if (count >= batch_size) {
+                return (rowAddrs.toArray, rowSizes.toArray)
+              }
+            }
+
+            (rowAddrs.toArray, rowSizes.toArray)
+          }
 
           override def hasNext: Boolean = {
             if (batch.isDefined) {
@@ -102,10 +137,14 @@ case class CometRowToColumnarExec(override val output: Seq[Attribute], child: Sp
               return false
             }
 
+            val (rowAddrs, rowSizes) = getRowInfo()
+
             batch = nativeUtil.getNextBatch(
               output.length,
               (arrayAddrs, schemaAddrs) => {
-                nativeLib.rowToColumnar(batch_size, schema, rowIter, arrayAddrs, schemaAddrs)
+                nativeLib.rowToColumnar(schema, rowAddrs, rowSizes, arrayAddrs, schemaAddrs)
+
+                rowAddrs.length
               })
 
             batch.isDefined

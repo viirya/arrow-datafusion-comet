@@ -17,8 +17,10 @@
 
 //! Define JNI APIs which can be called from Java/Scala.
 
+use super::{serde, utils::SparkArrowConvert, CometMemoryPool};
 use arrow::datatypes::DataType as ArrowDataType;
-use arrow_array::RecordBatch;
+use arrow_array::builder::ArrayBuilder;
+use arrow_array::{ArrayRef, RecordBatch};
 use datafusion::{
     execution::{
         disk_manager::DiskManagerConfig,
@@ -38,8 +40,6 @@ use jni::{
     JNIEnv,
 };
 use std::{collections::HashMap, sync::Arc, task::Poll};
-use arrow_array::builder::ArrayBuilder;
-use super::{serde, utils::SparkArrowConvert, CometMemoryPool};
 
 use crate::{
     errors::{try_unwrap_or_throw, CometError, CometResult},
@@ -52,7 +52,6 @@ use crate::{
 use datafusion_comet_proto::spark_operator::Operator;
 use datafusion_common::ScalarValue;
 use futures::stream::StreamExt;
-use jni::sys::jobject;
 use jni::{
     objects::GlobalRef,
     sys::{jboolean, jdouble, jintArray, jobjectArray, jstring},
@@ -60,8 +59,8 @@ use jni::{
 use tokio::runtime::Runtime;
 
 use crate::execution::operators::ScanExec;
-use log::info;
 use crate::execution::shuffle::row::append_columns;
+use log::info;
 
 /// Comet native execution context. Kept alive across JNI calls.
 struct ExecutionContext {
@@ -572,12 +571,12 @@ pub extern "system" fn Java_org_apache_comet_Native_sortRowPartitionsNative(
 pub extern "system" fn Java_org_apache_comet_Native_rowToColumnar(
     e: JNIEnv,
     _class: JClass,
-    batch_size: jint,
     serialized_datatypes: jobjectArray,
-    row_iter: JObject,
+    row_addresses: jlongArray,
+    row_sizes: jintArray,
     array_addrs: jlongArray,
     schema_addrs: jlongArray,
-) -> jlong {
+) {
     try_unwrap_or_throw(&e, |mut env| {
         let array_address_array = unsafe { JLongArray::from_raw(array_addrs) };
         let num_cols = env.get_array_length(&array_address_array)? as usize;
@@ -591,37 +590,67 @@ pub extern "system" fn Java_org_apache_comet_Native_rowToColumnar(
             unsafe { env.get_array_elements(&schema_address_array, ReleaseMode::NoCopyBack)? };
         let schema_addrs = &*schema_addrs;
 
+        // Prepare row addresses and sizes
+        let row_address_array = unsafe { JLongArray::from_raw(row_addresses) };
+        let row_num = env.get_array_length(&row_address_array)? as usize;
+        let row_addresses =
+            unsafe { env.get_array_elements(&row_address_array, ReleaseMode::NoCopyBack)? };
+
+        let row_size_array = unsafe { JIntArray::from_raw(row_sizes) };
+        let row_sizes =
+            unsafe { env.get_array_elements(&row_size_array, ReleaseMode::NoCopyBack)? };
+
+        let row_addresses_ptr = row_addresses.as_ptr();
+        let row_sizes_ptr = row_sizes.as_ptr();
+
+        // Create Arrow array builders from serialized datatypes
         let schema = convert_datatype_arrays(&mut env, serialized_datatypes)?;
-
-        let row_iter = Arc::new(jni_new_global_ref!(env, row_iter)?);
-        let row_iter_obj: &JObject = row_iter.as_obj();
-
-        println!("rowToColumnar");
-
         let mut data_builders: Vec<Box<dyn ArrayBuilder>> = vec![];
         schema.iter().try_for_each(|dt| {
-            crate::execution::shuffle::row::make_builders(dt, batch_size as usize, 0.0)
+            crate::execution::shuffle::row::make_builders(dt, row_num as usize, 0.0)
                 .map(|builder| data_builders.push(builder))?;
             Ok::<(), CometError>(())
         })?;
 
-        for i in 0..batch_size {
-            for (idx, builder) in data_builders.iter_mut().enumerate() {
-                append_columns(
-                    row_addresses_ptr,
-                    row_sizes_ptr,
-                    row_start,
-                    row_end,
-                    schema,
-                    idx,
-                    builder,
-                    prefer_dictionary_ratio,
-                )?;
-            }
+        // Append columns to builders
+        for (idx, builder) in data_builders.iter_mut().enumerate() {
+            append_columns(
+                row_addresses_ptr,
+                row_sizes_ptr,
+                0,
+                row_num,
+                &schema,
+                idx,
+                builder,
+                0.0,
+            )?;
         }
 
+        let array_refs: Result<Vec<ArrayRef>, _> = data_builders
+            .iter_mut()
+            .zip(schema.iter())
+            .map(|(builder, datatype)| crate::execution::shuffle::row::builder_to_array(builder, datatype, 0.0))
+            .collect();
 
+        let array_refs: Vec<ArrayRef> = array_refs?;
 
-        Ok(0)
+        if array_refs.len() != num_cols {
+            return Err(CometError::Internal(format!(
+                "Output column count mismatch: expected {num_cols}, got {}",
+                array_refs.len()
+            )));
+        }
+
+        let mut i = 0;
+        while i < array_refs.len() {
+            let array_ref = array_refs.get(i).ok_or(CometError::IndexOutOfBounds(i))?;
+            array_ref
+                .to_data()
+                .move_to_spark(array_addrs[i], schema_addrs[i])?;
+
+            i += 1;
+        }
+
+        Ok(())
     })
 }

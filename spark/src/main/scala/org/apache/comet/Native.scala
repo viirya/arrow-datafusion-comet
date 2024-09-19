@@ -126,20 +126,19 @@ class Native extends NativeBase {
 
   /**
    * Convert rows from a row-based iterator to Arrow batches
-   * @param row_iter
-   *   row-based iterator
+   * @param addresses
+   *   the array of addresses of Spark unsafe rows.
+   * @param rowSizes
+   *   the row sizes of Spark unsafe rows.
    * @param arrayAddrs
    *   the addresses of Arrow Array structures
    * @param schemaAddrs
    *   the addresses of Arrow Schema structures
-   *
-   * @return
-   *   the number of rows, if -1, it means end of the output.
    */
   @native def rowToColumnar(
-      batch_size: Int,
       datatypes: Array[Array[Byte]],
-      row_iter: CometRowIterator,
+      addresses: Array[Long],
+      rowSizes: Array[Int],
       arrayAddrs: Array[Long],
-      schemaAddrs: Array[Long]): Long
+      schemaAddrs: Array[Long]): Unit
 }
