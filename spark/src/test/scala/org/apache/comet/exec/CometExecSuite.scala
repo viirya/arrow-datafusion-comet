@@ -85,6 +85,8 @@ class CometExecSuite extends CometTestBase {
           case p: CometProjectExec => p
         }
         assert(cometProject.isDefined)
+
+        df.collect()
         // checkSparkAnswerAndOperator(df)
       }
     }

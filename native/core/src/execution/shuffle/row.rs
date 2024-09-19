@@ -1820,7 +1820,7 @@ pub(crate) fn append_columns(
     Ok(())
 }
 
-fn make_builders(
+pub(crate) fn make_builders(
     dt: &DataType,
     row_num: usize,
     prefer_dictionary_ratio: f64,

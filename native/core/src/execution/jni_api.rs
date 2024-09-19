@@ -38,7 +38,7 @@ use jni::{
     JNIEnv,
 };
 use std::{collections::HashMap, sync::Arc, task::Poll};
-
+use arrow_array::builder::ArrayBuilder;
 use super::{serde, utils::SparkArrowConvert, CometMemoryPool};
 
 use crate::{
@@ -61,6 +61,7 @@ use tokio::runtime::Runtime;
 
 use crate::execution::operators::ScanExec;
 use log::info;
+use crate::execution::shuffle::row::append_columns;
 
 /// Comet native execution context. Kept alive across JNI calls.
 struct ExecutionContext {
@@ -590,10 +591,36 @@ pub extern "system" fn Java_org_apache_comet_Native_rowToColumnar(
             unsafe { env.get_array_elements(&schema_address_array, ReleaseMode::NoCopyBack)? };
         let schema_addrs = &*schema_addrs;
 
-        let data_types = convert_datatype_arrays(&mut env, serialized_datatypes)?;
+        let schema = convert_datatype_arrays(&mut env, serialized_datatypes)?;
 
         let row_iter = Arc::new(jni_new_global_ref!(env, row_iter)?);
         let row_iter_obj: &JObject = row_iter.as_obj();
+
+        println!("rowToColumnar");
+
+        let mut data_builders: Vec<Box<dyn ArrayBuilder>> = vec![];
+        schema.iter().try_for_each(|dt| {
+            crate::execution::shuffle::row::make_builders(dt, batch_size as usize, 0.0)
+                .map(|builder| data_builders.push(builder))?;
+            Ok::<(), CometError>(())
+        })?;
+
+        for i in 0..batch_size {
+            for (idx, builder) in data_builders.iter_mut().enumerate() {
+                append_columns(
+                    row_addresses_ptr,
+                    row_sizes_ptr,
+                    row_start,
+                    row_end,
+                    schema,
+                    idx,
+                    builder,
+                    prefer_dictionary_ratio,
+                )?;
+            }
+        }
+
+
 
         Ok(0)
     })
