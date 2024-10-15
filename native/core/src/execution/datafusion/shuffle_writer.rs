@@ -437,6 +437,29 @@ fn append_columns(
         }};
     }
 
+    macro_rules! append_general_byte_dict {
+        ($kt:ty, $builder:ty, $dict_array:ty) => {{
+            let t = to.as_any_mut().downcast_mut::<$builder>().unwrap();
+            let f = from
+                .as_any()
+                .downcast_ref::<DictionaryArray<$kt>>()
+                .unwrap()
+                .downcast_dict::<$dict_array>()
+                .unwrap();
+            println!("dt: {}", f.data_type());
+            for &i in indices {
+                if f.is_valid(i) {
+                    println!("indices len: {}, i = {}, offset = {}", indices.len(), i, unsafe { f.values().value_offsets().get_unchecked(i) });
+                    println!("indices len: {}, i + 1 = {}, offset = {}", indices.len(), i + 1, unsafe { f.values().value_offsets().get_unchecked(i + 1) });
+                    println!("(end - start).to_usize() = {:?}", (unsafe { f.values().value_offsets().get_unchecked(i + 1) } - unsafe { f.values().value_offsets().get_unchecked(i) }).to_usize());
+                    t.append_value(f.value(i));
+                } else {
+                    t.append_null();
+                }
+            }
+        }};
+    }
+
     macro_rules! append_dict_helper {
         ($kt:ident, $ty:ty, $dict_array:ty) => {{
             match $kt.as_ref() {
@@ -513,28 +536,28 @@ fn append_columns(
         ($kt:ident, $byte_type:ty, $array_type:ty) => {{
             match $kt.as_ref() {
                 DataType::Int8 => {
-                    append_dict!(Int8Type, GenericByteDictionaryBuilder<Int8Type, $byte_type>, $array_type)
+                    append_general_byte_dict!(Int8Type, GenericByteDictionaryBuilder<Int8Type, $byte_type>, $array_type)
                 }
                 DataType::Int16 => {
-                    append_dict!(Int16Type,  GenericByteDictionaryBuilder<Int16Type, $byte_type>, $array_type)
+                    append_general_byte_dict!(Int16Type,  GenericByteDictionaryBuilder<Int16Type, $byte_type>, $array_type)
                 }
                 DataType::Int32 => {
-                    append_dict!(Int32Type,  GenericByteDictionaryBuilder<Int32Type, $byte_type>, $array_type)
+                    append_general_byte_dict!(Int32Type,  GenericByteDictionaryBuilder<Int32Type, $byte_type>, $array_type)
                 }
                 DataType::Int64 => {
-                    append_dict!(Int64Type,  GenericByteDictionaryBuilder<Int64Type, $byte_type>, $array_type)
+                    append_general_byte_dict!(Int64Type,  GenericByteDictionaryBuilder<Int64Type, $byte_type>, $array_type)
                 }
                 DataType::UInt8 => {
-                    append_dict!(UInt8Type,  GenericByteDictionaryBuilder<UInt8Type, $byte_type>, $array_type)
+                    append_general_byte_dict!(UInt8Type,  GenericByteDictionaryBuilder<UInt8Type, $byte_type>, $array_type)
                 }
                 DataType::UInt16 => {
-                    append_dict!(UInt16Type, GenericByteDictionaryBuilder<UInt16Type, $byte_type>, $array_type)
+                    append_general_byte_dict!(UInt16Type, GenericByteDictionaryBuilder<UInt16Type, $byte_type>, $array_type)
                 }
                 DataType::UInt32 => {
-                    append_dict!(UInt32Type, GenericByteDictionaryBuilder<UInt32Type, $byte_type>, $array_type)
+                    append_general_byte_dict!(UInt32Type, GenericByteDictionaryBuilder<UInt32Type, $byte_type>, $array_type)
                 }
                 DataType::UInt64 => {
-                    append_dict!(UInt64Type, GenericByteDictionaryBuilder<UInt64Type, $byte_type>, $array_type)
+                    append_general_byte_dict!(UInt64Type, GenericByteDictionaryBuilder<UInt64Type, $byte_type>, $array_type)
                 }
                 _ => unreachable!("Unknown key type for dictionary"),
             }
