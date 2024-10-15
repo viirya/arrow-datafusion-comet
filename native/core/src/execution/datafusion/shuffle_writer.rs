@@ -449,9 +449,12 @@ fn append_columns(
             println!("dt: {}", f.data_type());
             for &i in indices {
                 if f.is_valid(i) {
-                    println!("indices len: {}, i = {}, offset = {}", indices.len(), i, unsafe { f.values().value_offsets().get_unchecked(i) });
-                    println!("indices len: {}, i + 1 = {}, offset = {}", indices.len(), i + 1, unsafe { f.values().value_offsets().get_unchecked(i + 1) });
-                    println!("(end - start).to_usize() = {:?}", (unsafe { f.values().value_offsets().get_unchecked(i + 1) } - unsafe { f.values().value_offsets().get_unchecked(i) }).to_usize());
+                     let val = unsafe { f.keys().value_unchecked(i) };
+                     let value_idx = val.as_usize();
+                    println!("indices len: {}, i = {}, value_idx = {}, offset = {}", indices.len(), i, value_idx, unsafe { f.values().value_offsets().get_unchecked(value_idx) });
+                    println!("indices len: {}, i = {}, value_idx + 1 = {}, offset = {}", indices.len(), i, value_idx + 1, unsafe { f.values().value_offsets().get_unchecked(value_idx + 1) });
+                    println!("(end - start).to_usize() = {:?}", (unsafe { f.values().value_offsets().get_unchecked(value_idx + 1) } - unsafe { f.values().value_offsets().get_unchecked(value_idx) }).to_usize());
+                    println!("f.value({}): {:?}", i, f.value(i));
                     t.append_value(f.value(i));
                 } else {
                     t.append_null();
