@@ -56,6 +56,7 @@ use datafusion::{
 };
 use datafusion_physical_expr::EquivalenceProperties;
 use futures::{lock::Mutex, Stream, StreamExt, TryFutureExt, TryStreamExt};
+use futures::executor::block_on;
 use itertools::Itertools;
 use simd_adler32::Adler32;
 use tokio::task;
@@ -1139,7 +1140,7 @@ async fn external_shuffle(
     );
 
     while let Some(batch) = input.next().await {
-        repartitioner.insert_batch(batch?).await?;
+        block_on(repartitioner.insert_batch(batch?))?;
     }
     repartitioner.shuffle_write().await
 }
