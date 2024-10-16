@@ -272,6 +272,7 @@ impl PartitionBuffer {
         indices: &[usize],
         start_index: usize,
         time_metric: &Time,
+        partition_id: usize,
     ) -> AppendRowStatus {
         let mut mem_diff = 0;
         let mut start = start_index;
@@ -289,7 +290,7 @@ impl PartitionBuffer {
                 .iter_mut()
                 .zip(columns)
                 .for_each(|(builder, column)| {
-                    append_columns(builder, column, &indices[start..end], column.data_type());
+                    append_columns(builder, column, &indices[start..end], column.data_type(), partition_id);
                 });
             self.num_active_rows += end - start;
             if self.num_active_rows >= self.batch_size {
@@ -381,6 +382,7 @@ fn append_columns(
     from: &Arc<dyn Array>,
     indices: &[usize],
     data_type: &DataType,
+    partition_id: usize,
 ) {
     /// Append values from `from` to `to` using `indices`.
     macro_rules! append {
@@ -451,10 +453,10 @@ fn append_columns(
                 if f.is_valid(i) {
                      let val = unsafe { f.keys().value_unchecked(i) };
                      let value_idx = val.as_usize();
-                    println!("indices len: {}, i = {}, value_idx = {}, offset = {}", indices.len(), i, value_idx, unsafe { f.values().value_offsets().get_unchecked(value_idx) });
-                    println!("indices len: {}, i = {}, value_idx + 1 = {}, offset = {}", indices.len(), i, value_idx + 1, unsafe { f.values().value_offsets().get_unchecked(value_idx + 1) });
-                    println!("(end - start).to_usize() = {:?}", (unsafe { f.values().value_offsets().get_unchecked(value_idx + 1) } - unsafe { f.values().value_offsets().get_unchecked(value_idx) }).to_usize());
-                    println!("f.value({}): {:?}", i, f.value(i));
+                    println!("partition_id: {}, indices len: {}, i = {}, value_idx = {}, offset = {}", partition_id, indices.len(), i, value_idx, unsafe { f.values().value_offsets().get_unchecked(value_idx) });
+                    println!("partition_id: {}, indices len: {}, i = {}, value_idx + 1 = {}, offset = {}", partition_id, indices.len(), i, value_idx + 1, unsafe { f.values().value_offsets().get_unchecked(value_idx + 1) });
+                    println!("partition_id: {}, (end - start).to_usize() = {:?}", partition_id, (unsafe { f.values().value_offsets().get_unchecked(value_idx + 1) } - unsafe { f.values().value_offsets().get_unchecked(value_idx) }).to_usize());
+                    println!("partition_id: {}, f.value({}): {:?}", partition_id, i, f.value(i));
                     t.append_value(f.value(i));
                 } else {
                     t.append_null();
@@ -1030,7 +1032,7 @@ impl ShuffleRepartitioner {
         // If the range of indices is not big enough, just appending the rows into
         // active array builders instead of directly adding them as a record batch.
         let mut start_index: usize = 0;
-        let mut output_ret = output.append_rows(columns, indices, start_index, time_metric);
+        let mut output_ret = output.append_rows(columns, indices, start_index, time_metric, partition_id);
 
         loop {
             match output_ret {
@@ -1049,7 +1051,7 @@ impl ShuffleRepartitioner {
                     let time_metric = self.metrics.baseline.elapsed_compute();
 
                     start_index = new_start;
-                    output_ret = output.append_rows(columns, indices, start_index, time_metric);
+                    output_ret = output.append_rows(columns, indices, start_index, time_metric, partition_id);
 
                     if let AppendRowStatus::StartIndex(new_start) = output_ret {
                         if new_start == start_index {
