@@ -64,6 +64,29 @@ class CometExecSuite extends CometTestBase {
     }
   }
 
+  test("collectAsList on sort") {
+    withSQLConf(SQLConf.USE_V1_SOURCE_LIST.key -> "") {
+      withTable("test_data") {
+        // sql("CREATE TABLE test_data (c1 INT, c2 STRING, c3 STRING) " + "USING parquet")
+        val tableDF = spark.sparkContext
+          .parallelize(Seq((1, null, "A"), (2, "BBB", "B"), (3, "BBB", "B"), (4, "BBB", "B")), 3)
+          .toDF("c1", "c2", "c3")
+        tableDF
+          .coalesce(1)
+          .sortWithinPartitions("c1")
+          .writeTo("test_data")
+          .using("parquet")
+          .create()
+
+        val df = sql("SELECT * FROM test_data ORDER BY c1")
+        df.explain()
+        df.show()
+        // scalastyle:off println
+        println(df.collectAsList())
+      }
+    }
+  }
+
   test("DPP fallback") {
     withTempDir { path =>
       // create test data
