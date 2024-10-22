@@ -931,6 +931,7 @@ impl PhysicalPlanner {
                 // it would be more efficient if we could avoid that.
                 // https://github.com/apache/datafusion-comet/issues/963
                 let child = Self::wrap_in_copy_exec(child);
+                println!("SortExec.child: {:?}", child);
 
                 Ok((
                     scans,

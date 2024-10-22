@@ -993,6 +993,9 @@ class CometSparkSessionExtensions
             op
         }
 
+        // scalastyle:off println
+        println(s"newPlan: $newPlan")
+
         // Convert native execution block by linking consecutive native operators.
         var firstNativeOp = true
         newPlan.transformDown {
