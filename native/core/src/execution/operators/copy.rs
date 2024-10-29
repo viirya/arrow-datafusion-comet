@@ -264,11 +264,11 @@ fn copy_or_unpack_array(array: &Arc<dyn Array>, mode: &CopyMode) -> Result<Array
             let options = CastOptions::default();
             // We need to copy the array after `cast` because arrow-rs `take` kernel which is used
             // to unpack dictionary array might reuse the input array's null buffer.
-            Ok(copy_array(&cast_with_options(
+            cast_with_options(
                 array,
                 value_type.as_ref(),
                 &options,
-            )?))
+            )
         }
         _ => {
             if mode == &CopyMode::UnpackOrDeepCopy {

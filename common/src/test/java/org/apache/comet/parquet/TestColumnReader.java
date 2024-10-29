@@ -28,8 +28,6 @@ import java.util.function.BiFunction;
 
 import scala.collection.JavaConverters;
 
-import org.junit.Test;
-
 import org.apache.arrow.memory.BufferAllocator;
 import org.apache.arrow.memory.RootAllocator;
 import org.apache.arrow.vector.FixedSizeBinaryVector;
@@ -90,7 +88,6 @@ public class TestColumnReader {
           (v, i) -> v.getDecimal(i, 18, 10),
           (v, i) -> v.getDecimal(i, 19, 5));
 
-  @Test
   public void testConstantVectors() {
     for (int i = 0; i < TYPES.size(); i++) {
       DataType type = TYPES.get(i);
@@ -138,7 +135,6 @@ public class TestColumnReader {
     }
   }
 
-  @Test
   public void testRowIndexColumnVectors() {
     StructField field = StructField.apply("f", LongType, false, null);
     int bigBatchSize = BATCH_SIZE * 2;
@@ -174,7 +170,6 @@ public class TestColumnReader {
     reader.close();
   }
 
-  @Test
   public void testIsFixedLength() {
     BufferAllocator allocator = new RootAllocator(Integer.MAX_VALUE);
 

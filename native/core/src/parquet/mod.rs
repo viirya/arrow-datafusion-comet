@@ -495,6 +495,13 @@ pub extern "system" fn Java_org_apache_comet_parquet_Native_resetBatch(
     handle: jlong,
 ) {
     try_unwrap_or_throw(&env, |_| {
+        let ctx = get_context(handle)?;
+        println!("resetBatch: {}, arrays is some: {}", handle, ctx.arrays.is_some());
+
+        ctx.arrays.iter().for_each(|(array, schema)| {
+            println!("resetBatch. array is_released: {}", array.is_released());
+        });
+
         let reader = get_reader(handle)?;
         reader.reset_batch();
         Ok(())
@@ -541,10 +548,13 @@ pub extern "system" fn Java_org_apache_comet_parquet_Native_currentBatch(
     handle: jlong,
 ) -> jlongArray {
     try_unwrap_or_throw(&e, |env| {
-        println!("currentBatch");
         let ctx = get_context(handle)?;
+        println!("currentBatch: {}. arrays: {}", handle, ctx.arrays.is_some());
 
         // ctx.arrays = None;
+        ctx.arrays.iter().for_each(|(array, schema)| {
+            println!("array is_released: {}", array.is_released());
+        });
 
         let reader = &mut ctx.column_reader;
         let data = reader.current_batch()?;
@@ -553,6 +563,7 @@ pub extern "system" fn Java_org_apache_comet_parquet_Native_currentBatch(
         unsafe {
             let arrow_array = Arc::from_raw(array as *const FFI_ArrowArray);
             let arrow_schema = Arc::from_raw(schema as *const FFI_ArrowSchema);
+            println!("overwrite arrays");
             ctx.arrays = Some((arrow_array, arrow_schema));
 
             let res = env.new_long_array(2)?;
@@ -587,7 +598,18 @@ pub extern "system" fn Java_org_apache_comet_parquet_Native_closeColumnReader(
 ) {
     try_unwrap_or_throw(&env, |_| {
         unsafe {
+            println!("closeColumnReader: {}", handle);
+            let ctx = get_context(handle)?;
+
+            ctx.arrays.iter().for_each(|(array, schema)| {
+                println!("closeColumnReader. array is_released: {}", array.is_released());
+            });
+
+            let reader = &mut ctx.column_reader;
+            reader.check();
+
             let ctx = handle as *mut Context;
+
             let _ = Box::from_raw(ctx);
         };
         Ok(())

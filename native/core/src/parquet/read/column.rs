@@ -615,6 +615,10 @@ impl ColumnReader {
     pub fn skip_batch(&mut self, total: usize, put_nulls: bool) -> usize {
         make_func_mut!(self, skip_batch, total, put_nulls)
     }
+
+    pub fn check(&self) -> bool {
+        make_func!(self, check)
+    }
 }
 
 /// A batched reader for a primitive Parquet column.
@@ -952,6 +956,10 @@ impl<T: DataType> TypedColumnReader<T> {
             }
         }
         self.vector.num_values += len;
+    }
+
+    pub fn check(&self) -> bool {
+        self.vector.check()
     }
 
     /// Check a few pre-conditions for setting constants, as well as setting

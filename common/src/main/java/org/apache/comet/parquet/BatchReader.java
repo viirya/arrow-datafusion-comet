@@ -534,6 +534,7 @@ public class BatchReader extends RecordReader<Void, ColumnarBatch> implements Cl
 
   @SuppressWarnings("deprecation")
   private boolean loadNextRowGroupIfNecessary() throws Throwable {
+    System.out.println("loadNextRowGroupIfNecessary");
     // More rows can be read from loaded row group. No need to load next one.
     if (rowsRead != totalRowsLoaded) return true;
 

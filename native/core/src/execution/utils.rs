@@ -92,6 +92,7 @@ impl SparkArrowConvert for ArrayData {
     /// Returned pointers are Arc-ed and should be freed manually.
     #[allow(clippy::arc_with_non_send_sync)]
     fn to_spark(&self) -> Result<(i64, i64), ExecutionError> {
+        println!("to_spark");
         let arrow_array = Arc::new(FFI_ArrowArray::new(self));
         let arrow_schema = Arc::new(FFI_ArrowSchema::try_from(self.data_type())?);
 

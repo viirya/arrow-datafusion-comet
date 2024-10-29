@@ -170,7 +170,7 @@ impl CometBuffer {
     /// operators, they are responsible for copying content out of the buffers.
     pub unsafe fn to_arrow(&self) -> Result<ArrowBuffer, ExecutionError> {
         let ptr = NonNull::new_unchecked(self.data.as_ptr());
-        Ok(ArrowBuffer::from_custom_allocation(ptr, self.len, Arc::new(CometBufferAllocation::new())))
+        Ok(ArrowBuffer::from_custom_allocation(ptr, self.len, self.allocation.clone()))
         /*
         if Arc::strong_count(&self.allocation) > 1 {
             Err(ExecutionError::GeneralError(
@@ -181,6 +181,10 @@ impl CometBuffer {
             Ok(ArrowBuffer::from_custom_allocation(ptr, self.len, self.allocation.clone()))
         }
          */
+    }
+
+    pub fn check(&self) {
+        println!("buffer strong count: {}", Arc::strong_count(&self.allocation));
     }
 
     /// Resets this buffer by filling all bytes with zeros.
