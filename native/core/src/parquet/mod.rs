@@ -541,9 +541,13 @@ pub extern "system" fn Java_org_apache_comet_parquet_Native_currentBatch(
     handle: jlong,
 ) -> jlongArray {
     try_unwrap_or_throw(&e, |env| {
+        println!("currentBatch");
         let ctx = get_context(handle)?;
+
+        // ctx.arrays = None;
+
         let reader = &mut ctx.column_reader;
-        let data = reader.current_batch();
+        let data = reader.current_batch()?;
         let (array, schema) = data.to_spark()?;
 
         unsafe {
@@ -555,6 +559,7 @@ pub extern "system" fn Java_org_apache_comet_parquet_Native_currentBatch(
             let buf: [i64; 2] = [array, schema];
             env.set_long_array_region(&res, 0, &buf)
                 .expect("set long array region failed");
+            println!("end of currentBatch");
             Ok(res.into_raw())
         }
     })
