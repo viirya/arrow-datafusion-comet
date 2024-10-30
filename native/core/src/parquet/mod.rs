@@ -41,6 +41,7 @@ use jni::{
 
 use crate::execution::utils::SparkArrowConvert;
 use arrow::buffer::{Buffer, MutableBuffer};
+use itertools::Itertools;
 use jni::objects::{JBooleanArray, JLongArray, JPrimitiveArray, ReleaseMode};
 use read::ColumnReader;
 use util::jni::{convert_column_descriptor, convert_encoding};
@@ -496,11 +497,14 @@ pub extern "system" fn Java_org_apache_comet_parquet_Native_resetBatch(
 ) {
     try_unwrap_or_throw(&env, |_| {
         let ctx = get_context(handle)?;
-        println!("resetBatch: {}, arrays is some: {}", handle, ctx.arrays.is_some());
 
         ctx.arrays.iter().for_each(|(array, schema)| {
-            println!("resetBatch. array is_released: {}", array.is_released());
+            println!("resetBatch. check array is_released: {}", array.is_released());
         });
+
+        let reader = &mut ctx.column_reader;
+        println!("resetBatch check");
+        reader.check_reference()?;
 
         let reader = get_reader(handle)?;
         reader.reset_batch();
@@ -549,28 +553,29 @@ pub extern "system" fn Java_org_apache_comet_parquet_Native_currentBatch(
 ) -> jlongArray {
     try_unwrap_or_throw(&e, |env| {
         let ctx = get_context(handle)?;
-        println!("currentBatch: {}. arrays: {}", handle, ctx.arrays.is_some());
 
-        // ctx.arrays = None;
-        ctx.arrays.iter().for_each(|(array, schema)| {
-            println!("array is_released: {}", array.is_released());
-        });
+        ctx.arrays = None;
 
         let reader = &mut ctx.column_reader;
         let data = reader.current_batch()?;
         let (array, schema) = data.to_spark()?;
 
+        println!("currentBatch check");
+        reader.check_reference()?;
+
         unsafe {
             let arrow_array = Arc::from_raw(array as *const FFI_ArrowArray);
             let arrow_schema = Arc::from_raw(schema as *const FFI_ArrowSchema);
-            println!("overwrite arrays");
             ctx.arrays = Some((arrow_array, arrow_schema));
+
+            ctx.arrays.iter().for_each(|(array, schema)| {
+                println!("currentBatch. check array is_released: {}", array.is_released());
+            });
 
             let res = env.new_long_array(2)?;
             let buf: [i64; 2] = [array, schema];
             env.set_long_array_region(&res, 0, &buf)
                 .expect("set long array region failed");
-            println!("end of currentBatch");
             Ok(res.into_raw())
         }
     })
@@ -598,15 +603,27 @@ pub extern "system" fn Java_org_apache_comet_parquet_Native_closeColumnReader(
 ) {
     try_unwrap_or_throw(&env, |_| {
         unsafe {
-            println!("closeColumnReader: {}", handle);
             let ctx = get_context(handle)?;
-
             ctx.arrays.iter().for_each(|(array, schema)| {
-                println!("closeColumnReader. array is_released: {}", array.is_released());
+                println!("closeColumnReader. check array is_released: {}", array.is_released());
             });
 
             let reader = &mut ctx.column_reader;
-            reader.check();
+
+            println!("closeColumnReader first check");
+            reader.check_reference()?;
+
+            let mut cloned_arrays = ctx.arrays.iter().map(|(array, schema)| {
+                (array.clone(), schema.clone())
+            }).collect_vec();
+
+            println!("closeColumnReader second check");
+            reader.check_reference()?;
+
+            cloned_arrays.clear();
+
+            // Release the last exported array/schema if there is any
+            // ctx.arrays = None;
 
             let ctx = handle as *mut Context;
 

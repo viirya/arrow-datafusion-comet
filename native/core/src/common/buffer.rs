@@ -170,21 +170,26 @@ impl CometBuffer {
     /// operators, they are responsible for copying content out of the buffers.
     pub unsafe fn to_arrow(&self) -> Result<ArrowBuffer, ExecutionError> {
         let ptr = NonNull::new_unchecked(self.data.as_ptr());
+        self.check_reference()?;
         Ok(ArrowBuffer::from_custom_allocation(ptr, self.len, self.allocation.clone()))
+    }
+
+    /// Checks if this buffer is exclusively owned by Comet. If not, an error is returned.
+    /// We run this check when we want to update the buffer. If the buffer is also shared by
+    /// other components, e.g. one DataFusion operator stores the buffer, Comet cannot safely
+    /// modify the buffer.
+    pub fn check_reference(&self) -> Result<(), ExecutionError> {
+        println!("strong count: {}", Arc::strong_count(&self.allocation));
+        Ok(())
         /*
         if Arc::strong_count(&self.allocation) > 1 {
             Err(ExecutionError::GeneralError(
-                "cannot convert to ArrowBuffer since the buffer is shared".to_string(),
+                "Error on modifying a buffer which is not exclusively owned by Comet".to_string(),
             ))
         } else {
-            println!("strong count: {}", Arc::strong_count(&self.allocation));
-            Ok(ArrowBuffer::from_custom_allocation(ptr, self.len, self.allocation.clone()))
+            Ok(())
         }
          */
-    }
-
-    pub fn check(&self) {
-        println!("buffer strong count: {}", Arc::strong_count(&self.allocation));
     }
 
     /// Resets this buffer by filling all bytes with zeros.
@@ -233,7 +238,6 @@ impl CometBuffer {
 
 impl Drop for CometBuffer {
     fn drop(&mut self) {
-        println!("drop CometBuffer");
         if self.owned {
             unsafe {
                 std::alloc::dealloc(
@@ -290,14 +294,7 @@ struct CometBufferAllocation {
 
 impl CometBufferAllocation {
     fn new() -> Self {
-        println!("CometBufferAllocation::new");
         Self {}
-    }
-}
-
-impl Drop for CometBufferAllocation {
-    fn drop(&mut self) {
-        println!("dropping CometBufferAllocation");
     }
 }
 

@@ -203,7 +203,6 @@ impl ParquetMutableVector {
             } else {
                 self.arrow_type.clone()
             };
-            println!("get_array_data: data_type: {:?}, num_nulls: {}", data_type, self.num_nulls);
             let mut builder = ArrayData::builder(data_type)
                 .len(self.num_values)
                 .add_buffer(self.value_buffer.to_arrow()?)
@@ -218,10 +217,7 @@ impl ParquetMutableVector {
             if let Some(d) = &mut self.dictionary {
                 builder = builder.add_child_data(d.get_array_data()?);
             }
-            println!("before building array data");
-            let d = Ok(builder.build_unchecked());
-            println!("after building array data");
-            d
+            Ok(builder.build_unchecked())
         }
     }
 
@@ -253,8 +249,8 @@ impl ParquetMutableVector {
         matches!(dt, ArrowDataType::Boolean | ArrowDataType::Decimal128(_, _))
     }
 
-    pub fn check(&self) -> bool {
-        self.validity_buffer.check();
-        true
+    pub fn check_reference(&self) -> Result<(), ExecutionError> {
+        self.validity_buffer.check_reference()?;
+        self.value_buffer.check_reference()
     }
 }

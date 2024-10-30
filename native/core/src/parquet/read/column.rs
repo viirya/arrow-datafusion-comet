@@ -616,8 +616,8 @@ impl ColumnReader {
         make_func_mut!(self, skip_batch, total, put_nulls)
     }
 
-    pub fn check(&self) -> bool {
-        make_func!(self, check)
+    pub fn check_reference(&self) -> Result<(), ExecutionError> {
+        make_func!(self, check_reference)
     }
 }
 
@@ -958,8 +958,8 @@ impl<T: DataType> TypedColumnReader<T> {
         self.vector.num_values += len;
     }
 
-    pub fn check(&self) -> bool {
-        self.vector.check()
+    pub fn check_reference(&self) -> Result<(), ExecutionError> {
+        self.vector.check_reference()
     }
 
     /// Check a few pre-conditions for setting constants, as well as setting
