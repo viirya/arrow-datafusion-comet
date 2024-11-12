@@ -202,9 +202,14 @@ public class CometUnsafeShuffleWriter<K, V> extends ShuffleWriter<K, V> {
     // generic throwables.
     boolean success = false;
     try {
+      sorter.checkArray("before write");
+
       while (records.hasNext()) {
         insertRecordIntoSorter(records.next());
       }
+
+      sorter.checkArray("after write");
+
       closeAndWriteOutput();
       success = true;
     } finally {
@@ -237,6 +242,8 @@ public class CometUnsafeShuffleWriter<K, V> extends ShuffleWriter<K, V> {
             sparkConf,
             writeMetrics,
             schema);
+    sorter.checkArray("open");
+
     serBuffer = new ExposedByteArrayOutputStream(DEFAULT_INITIAL_SER_BUFFER_SIZE);
     serOutputStream = serializer.serializeStream(serBuffer);
   }
@@ -247,6 +254,7 @@ public class CometUnsafeShuffleWriter<K, V> extends ShuffleWriter<K, V> {
     updatePeakMemoryUsed();
     serBuffer = null;
     serOutputStream = null;
+    sorter.checkArray("closeAndWriteOutput");
     final SpillInfo[] spills = sorter.closeAndGetSpills();
     try {
       partitionLengths = mergeSpills(spills);

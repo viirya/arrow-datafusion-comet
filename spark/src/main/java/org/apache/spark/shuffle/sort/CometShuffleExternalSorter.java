@@ -278,13 +278,18 @@ public final class CometShuffleExternalSorter implements CometShuffleChecksumSup
   private long freeMemory() {
     updatePeakMemoryUsed();
     long memoryFreed = 0;
+    activeSpillSorter.checkArray("0");
+
     if (isAsync) {
+      System.out.println("isAsync");
       for (SpillSorter sorter : spillingSorters) {
         memoryFreed += sorter.freeMemory();
         sorter.freeArray();
       }
     }
+    activeSpillSorter.checkArray("1");
     memoryFreed += activeSpillSorter.freeMemory();
+    activeSpillSorter.checkArray("2");
     activeSpillSorter.freeArray();
 
     return memoryFreed;
@@ -370,6 +375,10 @@ public final class CometShuffleExternalSorter implements CometShuffleChecksumSup
     activeSpillSorter.insertRecord(recordBase, recordOffset, length, partitionId);
   }
 
+  public void checkArray(String msg) {
+    activeSpillSorter.checkArray(msg);
+  }
+
   /**
    * Close the sorter, causing any buffered data to be sorted and written out to disk.
    *
@@ -378,6 +387,7 @@ public final class CometShuffleExternalSorter implements CometShuffleChecksumSup
    */
   public SpillInfo[] closeAndGetSpills() throws IOException {
     if (activeSpillSorter != null) {
+      activeSpillSorter.checkArray("closeAndGetSpills");
       // Do not count the final file towards the spill count.
       final Tuple2<TempShuffleBlockId, File> spilledFileInfo =
           blockManager.diskBlockManager().createTempShuffleBlock();
@@ -441,6 +451,8 @@ public final class CometShuffleExternalSorter implements CometShuffleChecksumSup
       sorterArray = allocator.allocateArray(initialSize);
       this.inMemSorter.expandPointerArray(sorterArray);
 
+      System.out.println("sorterArray: " + sorterArray.memoryBlock().pageNumber);
+
       this.allocatedPages = new LinkedList<>();
 
       this.nativeLib = new Native();
@@ -477,11 +489,19 @@ public final class CometShuffleExternalSorter implements CometShuffleChecksumSup
       CometShuffleExternalSorter.this.spill();
     }
 
+    public void checkArray(String msg) {
+      System.out.println("checkArray " + msg + ": " + sorterArray.memoryBlock().pageNumber);
+    }
+
     /** Free the pointer array held by this sorter. */
     public void freeArray() {
       synchronized (this) {
-        inMemSorter.free();
-        freed = true;
+        if (!freed) {
+          System.out.println("freeArray: " + sorterArray.memoryBlock().pageNumber);
+
+          // inMemSorter.free();
+          freed = true;
+        }
       }
     }
 
@@ -495,6 +515,8 @@ public final class CometShuffleExternalSorter implements CometShuffleChecksumSup
       inMemSorter.reset();
       sorterArray = allocator.allocateArray(initialSize);
       inMemSorter.expandPointerArray(sorterArray);
+
+      System.out.println("reset: " + sorterArray.memoryBlock().pageNumber);
     }
 
     void setSpillInfo(SpillInfo spillInfo) {
