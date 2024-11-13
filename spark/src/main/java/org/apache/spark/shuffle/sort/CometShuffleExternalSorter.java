@@ -375,8 +375,8 @@ public final class CometShuffleExternalSorter implements CometShuffleChecksumSup
     activeSpillSorter.insertRecord(recordBase, recordOffset, length, partitionId);
   }
 
-  public void checkArray(String msg) {
-    activeSpillSorter.checkArray(msg);
+  public int checkArray(String msg) {
+    return activeSpillSorter.checkArray(msg);
   }
 
   /**
@@ -489,8 +489,9 @@ public final class CometShuffleExternalSorter implements CometShuffleChecksumSup
       CometShuffleExternalSorter.this.spill();
     }
 
-    public void checkArray(String msg) {
+    public int checkArray(String msg) {
       System.out.println("checkArray " + msg + ": " + sorterArray.memoryBlock().pageNumber);
+      return sorterArray.memoryBlock().pageNumber;
     }
 
     /** Free the pointer array held by this sorter. */

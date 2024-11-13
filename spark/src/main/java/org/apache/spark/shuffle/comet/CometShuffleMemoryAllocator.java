@@ -21,9 +21,11 @@ package org.apache.spark.shuffle.comet;
 
 import java.io.IOException;
 
+import org.apache.spark.errors.SparkCoreErrors;
 import org.apache.spark.memory.MemoryConsumer;
 import org.apache.spark.memory.MemoryMode;
 import org.apache.spark.memory.TaskMemoryManager;
+import org.apache.spark.unsafe.array.LongArray;
 import org.apache.spark.unsafe.memory.MemoryBlock;
 
 /**
@@ -34,6 +36,8 @@ import org.apache.spark.unsafe.memory.MemoryBlock;
  */
 public final class CometShuffleMemoryAllocator extends MemoryConsumer {
   private static CometShuffleMemoryAllocator INSTANCE;
+
+  private final long pageSize;
 
   public static synchronized CometShuffleMemoryAllocator getInstance(
       TaskMemoryManager taskMemoryManager, long pageSize) {
@@ -53,6 +57,7 @@ public final class CometShuffleMemoryAllocator extends MemoryConsumer {
 
   CometShuffleMemoryAllocator(TaskMemoryManager taskMemoryManager, long pageSize) {
     super(taskMemoryManager, pageSize, MemoryMode.OFF_HEAP);
+    this.pageSize = pageSize;
   }
 
   public long spill(long l, MemoryConsumer memoryConsumer) throws IOException {
@@ -68,19 +73,72 @@ public final class CometShuffleMemoryAllocator extends MemoryConsumer {
     this.freePage(block);
   }
 
+  protected synchronized MemoryBlock allocatePage(long required) {
+    MemoryBlock page = taskMemoryManager.allocatePage(Math.max(pageSize, required), this);
+    if (page == null || page.size() < required) {
+      throwOom(page, required);
+    }
+
+    System.out.println("allocatePage: " + page.pageNumber);
+
+    used += page.size();
+    return page;
+  }
+
+  protected synchronized void freePage(MemoryBlock page) {
+    System.out.println("freePage: " + page.pageNumber);
+
+    used -= page.size();
+    taskMemoryManager.freePage(page, this);
+  }
+
+  public synchronized LongArray allocateArray(long size) {
+    long required = size * 8L;
+    MemoryBlock page = taskMemoryManager.allocatePage(required, this);
+
+    System.out.println("allocateArray: " + page.pageNumber);
+
+    if (page == null || page.size() < required) {
+      throwOom(page, required);
+    }
+    used += required;
+    return new LongArray(page);
+  }
+
+  public synchronized void freeArray(LongArray array) {
+    System.out.println("freeArray: " + array.memoryBlock().pageNumber);
+
+    freePage(array.memoryBlock());
+  }
+
+  private void throwOom(final MemoryBlock page, final long required) {
+    long got = 0;
+    if (page != null) {
+      got = page.size();
+      taskMemoryManager.freePage(page, this);
+    }
+    taskMemoryManager.showMemoryUsage();
+    throw SparkCoreErrors.outOfMemoryError(required, got);
+  }
+
+  public synchronized void freeMemory(long size) {
+    taskMemoryManager.releaseExecutionMemory(size, this);
+    used -= size;
+  }
+
   /**
    * Returns the offset in the page for the given page plus base offset address. Note that this
    * method assumes that the page number is valid.
    */
-  public long getOffsetInPage(long pagePlusOffsetAddress) {
+  public synchronized long getOffsetInPage(long pagePlusOffsetAddress) {
     return taskMemoryManager.getOffsetInPage(pagePlusOffsetAddress);
   }
 
-  public long encodePageNumberAndOffset(int pageNumber, long offsetInPage) {
+  public synchronized long encodePageNumberAndOffset(int pageNumber, long offsetInPage) {
     return TaskMemoryManager.encodePageNumberAndOffset(pageNumber, offsetInPage);
   }
 
-  public long encodePageNumberAndOffset(MemoryBlock page, long offsetInPage) {
+  public synchronized long encodePageNumberAndOffset(MemoryBlock page, long offsetInPage) {
     return encodePageNumberAndOffset(page.pageNumber, offsetInPage - page.getBaseOffset());
   }
 }

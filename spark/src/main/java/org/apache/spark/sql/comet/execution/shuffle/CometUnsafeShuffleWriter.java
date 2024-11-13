@@ -202,13 +202,13 @@ public class CometUnsafeShuffleWriter<K, V> extends ShuffleWriter<K, V> {
     // generic throwables.
     boolean success = false;
     try {
-      sorter.checkArray("before write");
+      int pageNumber = sorter.checkArray("before write");
 
       while (records.hasNext()) {
         insertRecordIntoSorter(records.next());
       }
 
-      sorter.checkArray("after write");
+      sorter.checkArray("original: " + pageNumber + ", after write ");
 
       closeAndWriteOutput();
       success = true;
