@@ -952,6 +952,9 @@ impl PhysicalPlanner {
                 let data_schema = parse_message_type(&scan.data_schema).unwrap();
                 let required_schema = parse_message_type(&scan.required_schema).unwrap();
 
+                println!("data_schema: {:?}", data_schema);
+                println!("required_schema: {:?}", required_schema);
+
                 let data_schema_descriptor =
                     parquet::schema::types::SchemaDescriptor::new(Arc::new(data_schema));
                 let data_schema_arrow = Arc::new(

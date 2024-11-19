@@ -756,6 +756,7 @@ class CometExecSuite extends CometTestBase {
              |""".stripMargin
 
         val df = sql(query)
+        df.explain()
         checkSparkAnswer(df)
         val exchanges = stripAQEPlan(df.queryExecution.executedPlan).collect {
           case s: CometShuffleExchangeExec if s.shuffleType == CometColumnarShuffle =>

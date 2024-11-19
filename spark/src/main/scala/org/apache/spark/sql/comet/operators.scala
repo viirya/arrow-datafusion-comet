@@ -215,12 +215,11 @@ abstract class CometNativeExec extends CometExec {
         val nativeMetrics = CometMetricNode.fromCometPlan(this)
 
         def createCometExecIter(inputs: Seq[Iterator[ColumnarBatch]]): CometExecIterator = {
-          val it = new CometExecIterator(
-            CometExec.newIterId,
-            inputs,
-            output.length,
-            serializedPlanCopy,
-            nativeMetrics)
+          val id = CometExec.newIterId
+          // scalastyle:off println
+          println(s"id: $id, output: ${output.mkString(",")}")
+          val it =
+            new CometExecIterator(id, inputs, output.length, serializedPlanCopy, nativeMetrics)
 
           setSubqueries(it.id, this)
 
@@ -318,6 +317,8 @@ abstract class CometNativeExec extends CometExec {
           ZippedPartitionsRDD(sparkContext, inputs.toSeq)(createCometExecIter(_))
         } else {
           val partitionNum = firstNonBroadcastPlanNumPartitions.get
+          // scalastyle:off println
+          println(s"output: ${output.mkString(",")}")
           CometExecRDD(sparkContext, partitionNum)(createCometExecIter(_))
         }
     }

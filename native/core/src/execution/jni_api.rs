@@ -287,9 +287,10 @@ fn prepare_output(
     let results = output_batch.columns();
     let num_rows = output_batch.num_rows();
 
+    let id = exec_context.id;
     if results.len() != num_cols {
         return Err(CometError::Internal(format!(
-            "Output column count mismatch: expected {num_cols}, got {}",
+            "id: {id}, Output column count mismatch: expected {num_cols}, got {}",
             results.len()
         )));
     }
@@ -359,7 +360,7 @@ pub unsafe extern "system" fn Java_org_apache_comet_Native_executePlan(
         if exec_context.root_op.is_none() {
             let planner = PhysicalPlanner::new(Arc::clone(&exec_context.session_ctx))
                 .with_exec_id(exec_context_id);
-            let (scans, root_op) = planner.create_plan(
+            let (scans,     root_op) = planner.create_plan(
                 &exec_context.spark_plan,
                 &mut exec_context.input_sources.clone(),
                 exec_context.partition_count,
@@ -368,10 +369,10 @@ pub unsafe extern "system" fn Java_org_apache_comet_Native_executePlan(
             exec_context.root_op = Some(Arc::clone(&root_op));
             exec_context.scans = scans;
 
-            if exec_context.explain_native {
+            if true || exec_context.explain_native {
                 let formatted_plan_str =
                     DisplayableExecutionPlan::new(root_op.as_ref()).indent(true);
-                info!("Comet native query plan:\n {formatted_plan_str:}");
+                info!("Comet native query plan (id: {exec_context_id}):\n {formatted_plan_str:}");
             }
 
             let task_ctx = exec_context.session_ctx.task_ctx();
