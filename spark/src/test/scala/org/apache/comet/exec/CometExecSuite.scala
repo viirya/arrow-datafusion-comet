@@ -64,6 +64,69 @@ class CometExecSuite extends CometTestBase {
     }
   }
 
+  test(
+    "fix1: ReusedExchangeExec + CometShuffleExchangeExec under QueryStageExec " +
+      "should be CometRoot") {
+    val tableName = "table1"
+    val dim = "dim"
+
+    withSQLConf(
+      SQLConf.EXCHANGE_REUSE_ENABLED.key -> "true",
+      SQLConf.AUTO_BROADCASTJOIN_THRESHOLD.key -> "-1",
+      SQLConf.ADAPTIVE_AUTO_BROADCASTJOIN_THRESHOLD.key -> "-1",
+      CometConf.COMET_EXEC_SHUFFLE_ENABLED.key -> "true",
+      CometConf.COMET_SHUFFLE_MODE.key -> "jvm") {
+      withTable(tableName, dim) {
+
+        sql(
+          s"CREATE TABLE $tableName (id BIGINT, price FLOAT, date DATE, ts TIMESTAMP) USING parquet " +
+            "PARTITIONED BY (id)")
+        sql(s"CREATE TABLE $dim (id BIGINT, date DATE) USING parquet")
+
+        spark
+          .range(1, 100)
+          .withColumn("date", date_add(expr("DATE '1970-01-01'"), expr("CAST(id % 4 AS INT)")))
+          .withColumn("ts", expr("TO_TIMESTAMP(date)"))
+          .withColumn("price", expr("CAST(id AS FLOAT)"))
+          .select("id", "price", "date", "ts")
+          .coalesce(1)
+          .write
+          .mode(SaveMode.Append)
+          .partitionBy("id")
+          .saveAsTable(tableName)
+
+        spark
+          .range(1, 10)
+          .withColumn("date", expr("DATE '1970-01-02'"))
+          .select("id", "date")
+          .coalesce(1)
+          .write
+          .mode(SaveMode.Append)
+          .saveAsTable(dim)
+
+        val query =
+          s"""
+             |SELECT $tableName.id, sum(price) as sum_price
+             |FROM $tableName, $dim
+             |WHERE $tableName.id = $dim.id AND $tableName.date = $dim.date
+             |GROUP BY $tableName.id HAVING sum(price) > (
+             |  SELECT sum(price) * 0.0001 FROM $tableName, $dim WHERE $tableName.id = $dim.id AND $tableName.date = $dim.date
+             |  )
+             |ORDER BY sum_price
+             |""".stripMargin
+
+        val df = sql(query)
+        df.explain()
+        checkSparkAnswer(df)
+        val exchanges = stripAQEPlan(df.queryExecution.executedPlan).collect {
+          case s: CometShuffleExchangeExec if s.shuffleType == CometColumnarShuffle =>
+            s
+        }
+        assert(exchanges.length == 4)
+      }
+    }
+  }
+
   test("TopK operator should return correct results on dictionary column with nulls") {
     withSQLConf(SQLConf.USE_V1_SOURCE_LIST.key -> "") {
       withTable("test_data") {

@@ -2516,6 +2516,8 @@ object QueryPlanSerde extends Logging with ShimQueryPlanSerde with CometExprShim
             nativeScanBuilder.addFilePartitions(partitionBuilder.build())
           })
 
+          // scalastyle:off println
+          println(s"scan.requiredSchema: ${scan.requiredSchema}, output: ${scan.output}")
           val requiredSchemaParquet =
             new SparkToParquetSchemaConverter(conf).convert(scan.requiredSchema)
           val dataSchemaParquet =

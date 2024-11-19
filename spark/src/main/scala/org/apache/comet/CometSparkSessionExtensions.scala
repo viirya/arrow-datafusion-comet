@@ -203,6 +203,10 @@ class CometSparkSessionExtensions
                 && CometNativeScanExec.isSchemaSupported(partitionSchema)
                 && COMET_FULL_NATIVE_SCAN_ENABLED.get =>
             logInfo("Comet extension enabled for v1 full native Scan")
+            // scalastyle:off println
+            println(
+              s"scanExec.requiredSchema: ${scanExec.requiredSchema}, " +
+                s"output: ${scanExec.output}")
             CometScanExec(scanExec, session)
 
           // data source V1
