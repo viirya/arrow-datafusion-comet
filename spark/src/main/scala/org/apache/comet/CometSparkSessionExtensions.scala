@@ -1029,13 +1029,25 @@ class CometSparkSessionExtensions
         var firstNativeOp = true
         newPlan.transformDown {
           case op: CometNativeExec =>
-            if (firstNativeOp) {
+            val newPlan = if (firstNativeOp) {
+              // scalastyle:off println
+              println(s"first native op: ${op.nodeName}")
               firstNativeOp = false
               op.convertBlock()
             } else {
+              // scalastyle:off println
+              println(s"next native op: ${op.nodeName}")
               op
             }
+
+            if (op.children.isEmpty) {
+              firstNativeOp = true
+            }
+
+            newPlan
           case op =>
+            // scalastyle:off println
+            println(s"other op: ${op.nodeName}")
             firstNativeOp = true
             op
         }

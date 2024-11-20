@@ -64,6 +64,21 @@ class CometExecSuite extends CometTestBase {
     }
   }
 
+  test("limit 2 (cartesian product)") {
+    withSQLConf(SQLConf.AUTO_BROADCASTJOIN_THRESHOLD.key -> "-1") {
+      withParquetTable((0 until 5).map(i => (i, i + 1)), "tbl_a") {
+        withParquetTable((0 until 5).map(i => (i, i + 1)), "tbl_b") {
+          val df = sql("SELECT tbl_a._1, tbl_b._2 FROM tbl_a JOIN tbl_b LIMIT 2")
+          df.explain()
+          checkSparkAnswerAndOperator(
+            df,
+            classOf[CollectLimitExec],
+            classOf[CartesianProductExec])
+        }
+      }
+    }
+  }
+
   test("TopK operator should return correct results on dictionary column with nulls") {
     withSQLConf(SQLConf.USE_V1_SOURCE_LIST.key -> "") {
       withTable("test_data") {
@@ -1041,6 +1056,7 @@ class CometExecSuite extends CometTestBase {
       withParquetTable((0 until 5).map(i => (i, i + 1)), "tbl_a") {
         withParquetTable((0 until 5).map(i => (i, i + 1)), "tbl_b") {
           val df = sql("SELECT tbl_a._1, tbl_b._2 FROM tbl_a JOIN tbl_b LIMIT 2")
+          df.explain()
           checkSparkAnswerAndOperator(
             df,
             classOf[CollectLimitExec],

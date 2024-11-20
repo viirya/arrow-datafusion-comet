@@ -63,4 +63,4 @@ debug = true
 overflow-checks = false
 lto = "thin"
 codegen-units = 1
-strip = "debuginfo"
+# strip = "debuginfo"

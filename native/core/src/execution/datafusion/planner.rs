@@ -1010,6 +1010,7 @@ impl PhysicalPlanner {
                 // Generate file groups
                 let mut file_groups: Vec<Vec<PartitionedFile>> =
                     Vec::with_capacity(partition_count);
+                println!("scan.file_partitions: {}", scan.file_partitions.len());
                 scan.file_partitions.iter().try_for_each(|partition| {
                     let mut files = Vec::with_capacity(partition.partitioned_file.len());
                     partition.partitioned_file.iter().try_for_each(|file| {

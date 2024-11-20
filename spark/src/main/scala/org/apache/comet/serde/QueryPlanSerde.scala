@@ -2504,8 +2504,12 @@ object QueryPlanSerde extends Logging with ShimQueryPlanSerde with CometExprShim
           scan.inputRDD match {
             case rdd: DataSourceRDD =>
               val partitions = rdd.partitions
+              // scalastyle:off println
+              println(s"partitions: ${partitions.length}")
+              var numPart = 0
               partitions.foreach(p => {
                 val inputPartitions = p.asInstanceOf[DataSourceRDDPartition].inputPartitions
+                numPart = numPart + inputPartitions.length
                 inputPartitions.foreach(partition => {
                   partition2Proto(
                     partition.asInstanceOf[FilePartition],
@@ -2513,7 +2517,10 @@ object QueryPlanSerde extends Logging with ShimQueryPlanSerde with CometExprShim
                     scan.relation.partitionSchema)
                 })
               })
+              println(s"inputPartitions: ${numPart}")
             case rdd: FileScanRDD =>
+              // scalastyle:off println
+              println(s"partitions: ${rdd.filePartitions.length}")
               rdd.filePartitions.foreach(partition => {
                 partition2Proto(partition, nativeScanBuilder, scan.relation.partitionSchema)
               })
