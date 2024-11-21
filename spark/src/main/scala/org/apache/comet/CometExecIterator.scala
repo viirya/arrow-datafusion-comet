@@ -45,7 +45,8 @@ class CometExecIterator(
     inputs: Seq[Iterator[ColumnarBatch]],
     numOutputCols: Int,
     protobufQueryPlan: Array[Byte],
-    nativeMetrics: CometMetricNode)
+    nativeMetrics: CometMetricNode,
+    numPartitions: Int = TaskContext.get().numPartitions())
     extends Iterator[ColumnarBatch] {
 
   private val nativeLib = new Native()
@@ -53,15 +54,16 @@ class CometExecIterator(
   private val cometBatchIterators = inputs.map { iterator =>
     new CometBatchIterator(iterator, nativeUtil)
   }.toArray
+  // scalastyle:off println
+  println(s"numPartitions: $numPartitions")
   private val plan = {
     val configs = createNativeConf
-    TaskContext.get().numPartitions()
     nativeLib.createPlan(
       id,
       configs,
       cometBatchIterators,
       protobufQueryPlan,
-      TaskContext.get().numPartitions(),
+      numPartitions,
       nativeMetrics,
       new CometTaskMemoryManager(id))
   }
@@ -103,10 +105,13 @@ class CometExecIterator(
   }
 
   def getNextBatch(): Option[ColumnarBatch] = {
+    val partitionId = TaskContext.get().partitionId()
+    // scalastyle:off println
+    println(s"partitionId: $partitionId")
     nativeUtil.getNextBatch(
       numOutputCols,
       (arrayAddrs, schemaAddrs) => {
-        nativeLib.executePlan(plan, TaskContext.get().partitionId(), arrayAddrs, schemaAddrs)
+        nativeLib.executePlan(plan, partitionId, arrayAddrs, schemaAddrs)
       })
   }
 

@@ -2521,6 +2521,7 @@ object QueryPlanSerde extends Logging with ShimQueryPlanSerde with CometExprShim
             case rdd: FileScanRDD =>
               // scalastyle:off println
               println(s"partitions: ${rdd.filePartitions.length}")
+              println(s"rdd: ${rdd.getNumPartitions}")
               rdd.filePartitions.foreach(partition => {
                 partition2Proto(partition, nativeScanBuilder, scan.relation.partitionSchema)
               })
